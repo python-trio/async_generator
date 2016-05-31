@@ -1,36 +1,8 @@
-# In python we have:
-#   functions
-#   iterators
-#   generators as a convenient way to implement iterators like functions
-#   async functions
-#   async iterators
-#   async generators as a convenient ... wait, no, this doesn't exist
-#
-# The only built-in way to make an async iterator is to manually implement
-# __aiter__ and __anext__. This sucks -- have you ever thought "well, I could
-# use a generator... instead I'm going to manually define a class with
-# __iter__ and __next__ (and send and throw and close)"? Of course not,
-# generators do the same thing but are way easier.
-#
-# So, here's how you define an async generator:
-#
-# from this_file import async_generator, yield_
-#
-# @async_generator
-# async def double_all(ait):
-#     # you can use async constructs like in any async def function
-#     async for x in ait:
-#         # where in a normal generator you'd write
-#         #   yield foo
-#         # instead write
-#         #   await yield_(foo)
-#         await yield_(2 * x)
-
 import warnings
 from functools import wraps
 from types import coroutine
 
-__all__ = ["yield_", "async_generator"]
+__all__ = ["async_generator", "yield_"]
 
 class YieldWrapper:
     def __init__(self, payload):
@@ -55,9 +27,10 @@ async def yield_(value):
 # this async for loop happens directly inside the body of our caller. (If we
 # wanted to support 'asend' / 'athrow', similar to how real 'yield from'
 # forwards 'send' / 'throw', then life would be much more complicated.)
-async def yield_from_(aiter):
-    async for item in aiter:
-        await yield_(item)
+# XX disabled for now -- see README for details
+# async def yield_from_(aiter):
+#     async for item in aiter:
+#         await yield_(item)
 
 # This is the awaitable / iterator returned from asynciter.__anext__()
 class AIter:
@@ -100,14 +73,6 @@ class AsyncGenerator:
 
     def __anext__(self):
         return ANextIter(self._coroutine, "send", (None,), {})
-
-    def close(self):
-        # XX
-
-# Note:
-# - asend/athrow we leave out
-# - close needs to error out if it doesn't propagate the error.
-#   Similar to how regular generators work.
 
 def async_generator(coroutine_maker):
     @wraps(coroutine_maker)
