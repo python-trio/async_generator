@@ -13,7 +13,7 @@ class YieldWrapper:
 # eventually we must bottom out in a @coroutine that calls plain 'yield'.
 @coroutine
 def _yield_(value):
-    return yield YieldWrapper(value)
+    return (yield YieldWrapper(value))
 
 # But we wrap the bare @coroutine version in an async def, because async def
 # has the magic feature that users can get warnings messages if they forget to
@@ -33,7 +33,7 @@ async def yield_(value):
 #         await yield_(item)
 
 # This is the awaitable / iterator returned from asynciter.__anext__()
-class AIter:
+class ANextIter:
     def __init__(self, it):
         self._it = it
 
@@ -72,7 +72,7 @@ class AsyncGenerator:
         return self
 
     def __anext__(self):
-        return ANextIter(self._coroutine, "send", (None,), {})
+        return ANextIter(self._coroutine)
 
 def async_generator(coroutine_maker):
     @wraps(coroutine_maker)
