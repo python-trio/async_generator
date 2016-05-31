@@ -28,7 +28,7 @@ to create an *async iterator* by writing an *async function*. For
 example, suppose that in our example above, we want to read the
 documents from a network connection, instead of the local
 filesystem. Using the `asyncio.StreamReader interface
-<https://docs.python.org/3/library/asyncio-stream.html#asyncio.StreamReader>
+<https://docs.python.org/3/library/asyncio-stream.html#asyncio.StreamReader>`_
 we can write::
 
    async def load_json_lines(asyncio_stream_reader):
