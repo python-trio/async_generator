@@ -41,6 +41,25 @@ async def test_async_generator():
     assert (await collect(tripler.async_multiplied(async_range(5)))
             == [0, 3, 6, 9, 12])
 
+@async_generator
+async def async_gen_with_non_None_return():
+    await yield_(1)
+    await yield_(2)
+    return "hi"
+
+@pytest.mark.asyncio
+async def test_bad_return_value():
+    gen = async_gen_with_non_None_return()
+    async for item in gen:
+        assert item == 1
+        break
+    async for item in gen:
+        assert item == 2
+        break
+    with pytest.raises(RuntimeError):
+        async for item in gen:
+            assert False
+
 # XX disabled for now, see README
 # # Test yield_from_
 # @async_generator

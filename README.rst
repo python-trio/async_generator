@@ -96,6 +96,20 @@ feature implemented. By leaving these features out we can get some
 data on just how useful they really are.
 
 
+Return values
+-------------
+
+Async generators must return ``None`` (for example, by falling off the
+bottom of the function body). If they don't then we raise a
+``RuntimeError``. (Rationale: it would be easy to put the return value
+into the ``StopAsyncIteration`` exception, similar to how return
+values in regular generators are carried in ``StopIteration``
+exceptions. But there isn't much point, because generator return
+values are really only useful with ``yield from``, and we don't
+support ``yield from``. And making it an error lets us keep our
+options open for the future.)
+
+
 ``close``
 ---------
 
