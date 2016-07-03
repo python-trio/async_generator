@@ -4,6 +4,7 @@ python:
 sudo: false
 
 before_install:
+  - pip install -r test-requirements.txt
   - pip install codecov
 
 script:
