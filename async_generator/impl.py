@@ -2,10 +2,6 @@ import warnings
 from functools import wraps
 from types import coroutine
 
-__version__ = "0.0.1"
-
-__all__ = ["async_generator", "yield_"]
-
 class YieldWrapper:
     def __init__(self, payload):
         self.payload = payload

@@ -2,7 +2,7 @@ import types
 import asyncio
 import pytest
 
-from async_generator import async_generator, yield_
+from . import async_generator, yield_
 
 # like list(it) but works on async iterators
 async def collect(ait):

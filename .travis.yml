@@ -7,9 +7,13 @@ before_install:
   - pip install -r test-requirements.txt
   - pip install codecov
 
+install:
+  - pip install .
+
 script:
-#  - py.test --cov=async_generator --cov-config=.coveragerc
-  - py.test
+  - mkdir empty
+  - cd empty
+  - py.test --pyargs async_generator --cov=async_generator --cov-config=.coveragerc
 
 
 after_success:

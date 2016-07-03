@@ -10,10 +10,11 @@ setup(
     author="Nathaniel J. Smith",
     author_email="njs@pobox.com",
     license="MIT",
+    packages=find_packages(),
     url="https://github.com/njsmith/async_generator",
     py_modules=["async_generator"],
     classifiers=[
-        "Development Status :: 3 - Alpha",
+        "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python :: 3",
