@@ -71,17 +71,15 @@ async def test_bad_return_value():
         break
     with pytest.raises(RuntimeError):
         async for item in gen:
-            assert False
+            assert False   # pragma: no cover
 
 ################################################################
 #
-# Nasty edge case involving resuming with 'throw'
+# Exhausitve tests of the different ways to re-enter a coroutine.
 #
-# Test that our YieldWrapper interception is applied no matter how we re-enter
-# the coroutine iterator -- it used to be that re-entering via send/__next__
-# would work, but throw() immediately followed by an await yield_(...)
-# wouldn't work, and the YieldWrapper object would propagate back out to the
-# coroutine runner.
+# It used to be that re-entering via send/__next__ would work, but throw()
+# immediately followed by an await yield_(...)  wouldn't work, and the
+# YieldWrapper object would propagate back out to the coroutine runner.
 #
 # Before I fixed this, the 'assert value is None' check below would fail
 # (because of the YieldWrapper leaking out), and if you removed that
@@ -99,17 +97,28 @@ class MyTestError(Exception):
 # thrown in from the coroutine runner -- this simulates something like an
 # 'await sock.recv(...) -> TimeoutError'.
 @types.coroutine
-def coroutine_that_is_thrown_into():
+def hit_me():
     yield "hit me"
 
+@types.coroutine
+def number_me():
+    assert (yield "number me") == 1
+
+@types.coroutine
+def next_me():
+    assert (yield "next me") is None
+
 @async_generator
-async def yield_after_being_thrown_into():
+async def yield_after_different_entries():
     await yield_(1)
     try:
-        await coroutine_that_is_thrown_into()
+        await hit_me()
     except MyTestError:
         await yield_(2)
+    await number_me()
     await yield_(3)
+    await next_me()
+    await yield_(4)
 
 def hostile_coroutine_runner(coro):
     coro_iter = coro.__await__()
@@ -118,16 +127,18 @@ def hostile_coroutine_runner(coro):
         try:
             if value == "hit me":
                 value = coro_iter.throw(MyTestError())
+            elif value == "number me":
+                value = coro_iter.send(1)
             else:
-                assert value is None
+                assert value in (None, "next me")
                 value = coro_iter.__next__()
         except StopIteration as exc:
             return exc.value
 
-def test_yield_after_being_thrown_into():
-    coro = collect(yield_after_being_thrown_into())
+def test_yield_different_entries():
+    coro = collect(yield_after_different_entries())
     yielded = hostile_coroutine_runner(coro)
-    assert yielded == [1, 2, 3]
+    assert yielded == [1, 2, 3, 4]
 
 ################################################################
 #
