@@ -142,6 +142,33 @@ def test_yield_different_entries():
 
 ################################################################
 #
+# close
+#
+################################################################
+
+@async_generator
+async def close_me_aiter(track):
+    try:
+        await yield_(1)
+    except GeneratorExit:
+        track[0] = True
+        raise
+    else:
+        track[0] = False
+
+def test_close():
+    track = [None]
+    aiter = close_me_aiter(track)
+    coro = aiter.__anext__()
+    try:
+        next(coro)
+    except StopIteration as exc:
+        assert exc.value == 1
+    coro.close()
+    assert track[0]
+
+################################################################
+#
 # yield from
 #
 ################################################################
