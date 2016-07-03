@@ -12,7 +12,7 @@ The async_generator library
 This is a tiny library to add "async generators" to Python 3.5. What
 are those?
 
-Option 1: [my 5-minute lightning talk demo from PyCon 2015](https://youtu.be/PulzIT8KYLk?t=24m30s)
+Option 1: `my 5-minute lightning talk demo from PyCon 2015 <https://youtu.be/PulzIT8KYLk?t=24m30s>`_
 
 Option 2: read on!
 
