@@ -1,6 +1,14 @@
 The async_generator library
 ===========================
 
+.. image:: https://travis-ci.org/njsmith/async_generator.svg?branch=master
+   :target: https://travis-ci.org/njsmith/async_generator
+   :alt: Automated test status
+
+.. image:: https://codecov.io/gh/njsmith/async_generator/branch/master/graph/badge.svg
+   :target: https://codecov.io/gh/njsmith/async_generator
+   :alt: Test coverage
+
 Python's iterators are great to use -- but manually implementing the
 iterator protocol (``__iter__``, ``__next__``) can be very
 annoying. No-one wants to do that all the time.
@@ -128,6 +136,10 @@ Changes
   calls could escape out to the top-level coroutine runner and get
   lost, if the last trap out to the coroutine runner before the
   ``await yield_(...)`` caused an exception to be injected.
+* Infinitesimally more efficient due to re-using internal
+  ``ANextIter`` objects instead of recreating them on each call to
+  ``__anext__``.
+* 100% test coverage.
 
 0.0.1
 -----
