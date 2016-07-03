@@ -1,1 +1,2 @@
 include LICENSE.txt README.rst CODE_OF_CONDUCT.md
+include test-requirements.txt .coveragerc
