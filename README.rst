@@ -116,3 +116,20 @@ options open for the future.)
 We do not implement any equivalent to the generator ``close``
 method. We are currently trying to figure out whether or not this is a
 bug.
+
+
+Changes
+=======
+
+0.0.2
+-----
+
+* Fixes a very nasty and hard-to-hit bug where ``await yield_(...)``
+  calls could escape out to the top-level coroutine runner and get
+  lost, if the last trap out to the coroutine runner before the
+  ``await yield_(...)`` caused an exception to be injected.
+
+0.0.1
+-----
+
+Initial release.
