@@ -8,7 +8,9 @@ before_install:
   - pip install codecov
 
 script:
-  - py.test --cov=async_generator --cov-config=.coveragerc
+#  - py.test --cov=async_generator --cov-config=.coveragerc
+  - py.test
+
 
 after_success:
   - codecov
