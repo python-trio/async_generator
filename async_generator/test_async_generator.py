@@ -153,7 +153,7 @@ async def close_me_aiter(track):
     except GeneratorExit:
         track[0] = True
         raise
-    else:
+    else:  # pragma: no cover
         track[0] = False
 
 def test_close():
