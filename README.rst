@@ -9,6 +9,13 @@ The async_generator library
    :target: https://codecov.io/gh/njsmith/async_generator
    :alt: Test coverage
 
+This is a tiny library to add "async generators" to Python 3.5. What
+are those?
+
+Option 1: [my 5-minute lightning talk demo from PyCon 2015](https://youtu.be/PulzIT8KYLk?t=24m30s)
+
+Option 2: read on!
+
 Python's iterators are great to use -- but manually implementing the
 iterator protocol (``__iter__``, ``__next__``) can be very
 annoying. No-one wants to do that all the time.
