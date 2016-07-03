@@ -42,12 +42,9 @@ class ANextIter:
     def __await__(self):
         return self
 
-    def __next__(self):
-        return self.send(None)
-
-    def send(self, value):
+    def _invoke(self, fn, *args):
         try:
-            result = self._it.send(value)
+            result = fn(*args)
         except StopIteration as e:
             # The underlying generator returned, so we should signal the end
             # of iteration.
@@ -60,21 +57,27 @@ class ANextIter:
         else:
             return result
 
+    def __next__(self):
+        return self._invoke(self._it.__next__)
+
+    def send(self, value):
+        return self._invoke(self._it.send, value)
+
     def throw(self, type, value=None, traceback=None):
-        return self._it.throw(type, value, traceback)
+        return self._invoke(self._it.throw, type, value, traceback)
 
     def close(self):
         return self._it.close()
 
 class AsyncGenerator:
     def __init__(self, coroutine):
-        self._coroutine = coroutine
+        self._coroutine_iter = coroutine.__await__()
 
     async def __aiter__(self):
         return self
 
     def __anext__(self):
-        return ANextIter(self._coroutine)
+        return ANextIter(self._coroutine_iter)
 
 def async_generator(coroutine_maker):
     @wraps(coroutine_maker)
