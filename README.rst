@@ -136,8 +136,8 @@ bug.
 Changes
 =======
 
-1.0
----
+1.0 (2016-07-03)
+================
 
 * Fixes a very nasty and hard-to-hit bug where ``await yield_(...)``
   calls could escape out to the top-level coroutine runner and get
@@ -148,7 +148,7 @@ Changes
   ``__anext__``.
 * 100% test coverage.
 
-0.0.1
------
+0.0.1 (2016-05-31)
+------------------
 
 Initial release.
