@@ -71,13 +71,13 @@ class ANextIter:
 
 class AsyncGenerator:
     def __init__(self, coroutine):
-        self._coroutine_iter = coroutine.__await__()
+        self._anext_iter = ANextIter(coroutine.__await__())
 
     async def __aiter__(self):
         return self
 
     def __anext__(self):
-        return ANextIter(self._coroutine_iter)
+        return self._anext_iter
 
 def async_generator(coroutine_maker):
     @wraps(coroutine_maker)
