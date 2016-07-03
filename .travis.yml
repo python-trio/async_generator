@@ -1,0 +1,13 @@
+language: python
+python:
+  - 3.5
+sudo: false
+
+before_install:
+  - pip install codecov
+
+script:
+  - py.test --cov=async_generator --cov-config=.coveragerc
+
+after_success:
+  - codecov
