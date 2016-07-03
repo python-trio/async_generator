@@ -136,8 +136,8 @@ bug.
 Changes
 =======
 
-0.0.2
------
+1.0
+---
 
 * Fixes a very nasty and hard-to-hit bug where ``await yield_(...)``
   calls could escape out to the top-level coroutine runner and get
