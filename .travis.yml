@@ -1,6 +1,7 @@
 language: python
 python:
-  - 3.5
+  - 3.5.0
+  - 3.5.2
 sudo: false
 
 before_install:
