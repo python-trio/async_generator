@@ -87,6 +87,9 @@ class AsyncGenerator:
     def __anext__(self):
         return self._anext_iter
 
+    def close(self):
+        return self._anext_iter.close()
+
 def async_generator(coroutine_maker):
     @wraps(coroutine_maker)
     def async_generator_maker(*args, **kwargs):

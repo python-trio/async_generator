@@ -151,21 +151,21 @@ async def close_me_aiter(track):
     try:
         await yield_(1)
     except GeneratorExit:
-        track[0] = True
+        track[0] = "closed"
         raise
     else:  # pragma: no cover
-        track[0] = False
+        track[0] = "wtf"
 
-def test_close():
+@pytest.mark.asyncio
+async def test_close():
     track = [None]
     aiter = close_me_aiter(track)
-    coro = aiter.__anext__()
-    try:
-        next(coro)
-    except StopIteration as exc:
-        assert exc.value == 1
-    coro.close()
-    assert track[0]
+    async for obj in aiter:
+        assert obj == 1
+        break
+    assert track[0] is None
+    aiter.close()
+    assert track[0] == "closed"
 
 ################################################################
 #

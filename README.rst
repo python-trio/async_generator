@@ -128,9 +128,42 @@ options open for the future.)
 ``close``
 ---------
 
-We do not implement any equivalent to the generator ``close``
-method. We are currently trying to figure out whether or not this is a
-bug.
+Async generators have a ``.close()`` method. This is a regular method,
+not an async method -- call it like ``ait.close()``, *not* ``await
+ait.close()``.
+
+This is important to allow resources to be freed promptly from an
+iterator that will never be exhausted. For example, imagine that we
+have an asynchronous WSGI-like API where some code reads from an
+asynchronous iterator, and sends the data on somewhere else::
+
+  async def f():
+      ait = ...
+      async for data in ait:
+          await send(data)
+
+And now suppose that ``send(...)`` fails, perhaps because the remote
+side closed the connection. When this happens, we want to let the
+asynchronous iterator know that we will never finish iterating over
+it. So a better way to write this code is::
+
+  async def f():
+      ait = ...
+      try:
+          async for data in ait:
+              await send(data)
+      finally:
+          ait.close()
+
+or perhaps::
+
+  async def f():
+      with contextlib.closing(...) as ait:
+          async for data in ait:
+              await send(data)
+
+This is a non-async method because it may be called from ``__del__``
+methods, when no coroutine runner is available.
 
 
 Changes
