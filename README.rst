@@ -12,7 +12,7 @@ The async_generator library
 This is a tiny library to add "async generators" to Python 3.5. What
 are those?
 
-Option 1: `my 5-minute lightning talk demo from PyCon 2015 <https://youtu.be/PulzIT8KYLk?t=24m30s>`_
+Option 1: `my 5-minute lightning talk demo from PyCon 2016 <https://youtu.be/PulzIT8KYLk?t=24m30s>`_
 
 Option 2: read on!
 
@@ -169,8 +169,18 @@ methods, when no coroutine runner is available.
 Changes
 =======
 
+1.1 (????-??-??)
+----------------
+
+* Expose ``.close()`` method on async generators.
+* Adapt to `the change in Python 3.5.2
+  <https://www.python.org/dev/peps/pep-0492/#api-design-and-implementation-revisions>`_
+  where ``__aiter__`` should now be a regular method instead of an
+  async method.
+
+
 1.0 (2016-07-03)
-================
+----------------
 
 * Fixes a very nasty and hard-to-hit bug where ``await yield_(...)``
   calls could escape out to the top-level coroutine runner and get
@@ -180,6 +190,7 @@ Changes
   ``ANextIter`` objects instead of recreating them on each call to
   ``__anext__``.
 * 100% test coverage.
+
 
 0.0.1 (2016-05-31)
 ------------------
