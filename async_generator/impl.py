@@ -1,3 +1,4 @@
+import sys
 import warnings
 from functools import wraps
 from types import coroutine
@@ -35,8 +36,16 @@ class ANextIter:
     def __init__(self, it):
         self._it = it
 
-    def __await__(self):
-        return self
+    # On python 3.5.0 and 3.5.1, __await__ is mandatory.
+    # Starting in 3.5.2, __await__ is unnecessary and triggers a
+    #    PendingDeprecationWarning.
+    # See:
+    #   https://www.python.org/dev/peps/pep-0492/#api-design-and-implementation-revisions
+    #   https://docs.python.org/3/reference/datamodel.html#async-iterators
+    #   https://bugs.python.org/issue27243
+    if sys.version_info < (3, 5, 2):
+        def __await__(self):
+            return self
 
     def _invoke(self, fn, *args):
         try:
