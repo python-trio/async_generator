@@ -306,3 +306,35 @@ async def yields_from_returns_1():
 @pytest.mark.asyncio
 async def test_async_yield_from_return_value():
     assert await collect(yields_from_returns_1()) == [0, 1]
+
+################################################################
+# __del__
+################################################################
+
+@pytest.mark.asyncio
+async def test___del__():
+    gen = async_range(10)
+    # Hasn't started yet, so no problem
+    gen.__del__()
+
+    gen = async_range(10)
+    await collect(gen)
+    # Exhausted, so no problem
+    gen.__del__()
+
+    gen = async_range(10)
+    await gen.aclose()
+    # Closed, so no problem
+    gen.__del__()
+
+    gen = async_range(10)
+    await gen.__anext__()
+    await gen.aclose()
+    # Closed, so no problem
+    gen.__del__()
+
+    gen = async_range(10)
+    await gen.__anext__()
+    # Started, but not exhausted or closed -- big problem
+    with pytest.raises(RuntimeError):
+        gen.__del__()
