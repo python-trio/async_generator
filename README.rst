@@ -106,7 +106,7 @@ details.
 Changes
 =======
 
-1.1 (????-??-??)
+1.1 (2016-11-06)
 ----------------
 
 * Support for ``asend``\/``athrow``\/``aclose``
@@ -117,6 +117,9 @@ Changes
   <https://www.python.org/dev/peps/pep-0492/#api-design-and-implementation-revisions>`_
   where ``__aiter__`` should now be a regular method instead of an
   async method.
+* Adapt to Python 3.5.2's pickiness about iterating over
+  already-exhausted coroutines.
+* 100% test coverage.
 
 
 1.0 (2016-07-03)
