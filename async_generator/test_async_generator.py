@@ -216,13 +216,13 @@ async def test_aclose_on_unstarted_generator():
     aiter = close_me_aiter([None])
     await aiter.aclose()
     async for obj in aiter:
-        assert False
+        assert False  # pragma: no cover
 
 @pytest.mark.asyncio
 async def test_aclose_on_finished_generator():
     aiter = async_range(3)
     async for obj in aiter:
-        pass
+        pass  # pragma: no cover
     await aiter.aclose()
 
 @async_generator
