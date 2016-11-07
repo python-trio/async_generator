@@ -2,6 +2,8 @@ import sys
 import warnings
 from functools import wraps
 from types import coroutine
+from inspect import (
+    getcoroutinestate, CORO_CREATED, CORO_CLOSED, CORO_SUSPENDED)
 
 class YieldWrapper:
     def __init__(self, payload):
@@ -105,13 +107,6 @@ class AsyncGenerator:
         def __aiter__(self):
             return self
 
-    def _coro_finished(self):
-        return self._coroutine.cr_frame is None
-
-    def _coro_started(self):
-        return (self._coroutine.cr_frame is None
-                or self._coroutine.cr_frame.f_lasti != -1)
-
     ################################################################
     # Core functionality
     ################################################################
@@ -135,7 +130,6 @@ class AsyncGenerator:
             return await self._do_it(self._it.throw, *args)
 
     async def _do_delegate(self, delegate_fn, *args):
-        assert not self._coro_finished()
         assert self._delegate is not None
         try:
             return await delegate_fn(self._delegate, *args)
@@ -152,7 +146,7 @@ class AsyncGenerator:
         # to iterate them after they're exhausted. Generators OTOH just raise
         # StopIteration. We want to convert the one into the other, so we need
         # to avoid iterating stopped coroutines.
-        if self._coro_finished():
+        if getcoroutinestate(self._coroutine) is CORO_CLOSED:
             raise StopAsyncIteration()
         result = await ANextIter(self._it, start_fn, *args)
         if type(result) is YieldFromWrapper:
@@ -166,12 +160,13 @@ class AsyncGenerator:
     ################################################################
 
     async def aclose(self):
-        if not self._coro_started():
+        state = getcoroutinestate(self._coroutine)
+        if state is CORO_CREATED:
             # Make sure that aclose() on an unstarted generator returns
             # successfully and prevents future iteration.
             self._it.close()
             return
-        if self._coro_finished():
+        elif state is CORO_CLOSED:
             return
         try:
             await self.athrow(GeneratorExit)
@@ -181,7 +176,7 @@ class AsyncGenerator:
             raise RuntimeError("async_generator ignored GeneratorExit")
 
     def __del__(self):
-        if self._coro_started() and not self._coro_finished():
+        if getcoroutinestate(self._coroutine) is CORO_SUSPENDED:
             # This exception will get swallowed because this is __del__, but
             # it's an easy way to trigger the print-to-console logic
             raise RuntimeError(
