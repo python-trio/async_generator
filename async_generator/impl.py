@@ -20,21 +20,23 @@ def _yield_(value):
 async def yield_(value):
     return await _yield_(value)
 
-# class YieldFromWrapper:
-#     def __init__(self, payload):
-#         self.payload = payload
-#
-# @coroutine
-# def _yield_from_(delegate):
-#     return (yield YieldFromWrapper(delegate))
-#
-# async def yield_from_(delegate):
-#     delegate = type(delegate).__aiter__()
-#     if sys.version_info < (3, 5, 2):
-#         delegate = await delegate
-#     return await _yield_from_(delegate)
+# This is a little tricky -- when we see a yield_from, we actually yield_ a
+# magic object (NOT yield! yield_!). The way this works is that the ANextIter
+# layer doesn't have to worry about yield from -- it gets invoked to run a
+# single round of the underlying coroutine until it hits a yield_ or
+# yield_from_, and then the next layer up (inside AsyncGenerator) takes care
+# of the yield_from_ part.
+class YieldFromWrapper:
+    def __init__(self, payload):
+        self.payload = payload
 
-# This is the awaitable / iterator returned from asynciter.__anext__() and
+async def yield_from_(delegate):
+    delegate = type(delegate).__aiter__(delegate)
+    if sys.version_info < (3, 5, 2):
+        delegate = await delegate
+    return await yield_(YieldFromWrapper(delegate))
+
+# This is the awaitable / iterator that implements asynciter.__anext__() and
 # friends.
 #
 # Note: we can be sloppy about the distinction between
@@ -77,10 +79,7 @@ class ANextIter:
         except StopIteration as e:
             # The underlying generator returned, so we should signal the end
             # of iteration.
-            if e.value is not None:
-                raise RuntimeError(
-                    "@async_generator functions must return None")
-            raise StopAsyncIteration
+            raise StopAsyncIteration(e.value)
         if isinstance(result, YieldWrapper):
             raise StopIteration(result.payload)
         else:
@@ -89,7 +88,8 @@ class ANextIter:
 class AsyncGenerator:
     def __init__(self, coroutine):
         self._coroutine = coroutine
-        self._it = type(coroutine).__await__(coroutine)
+        self._it = coroutine.__await__()
+        self._delegate = None
 
     # On python 3.5.0 and 3.5.1, __aiter__ must be awaitable.
     # Starting in 3.5.2, it should not be awaitable, and if it is, then it
@@ -105,28 +105,73 @@ class AsyncGenerator:
         def __aiter__(self):
             return self
 
-    def __anext__(self):
-        return ANextIter(self._it, self._it.__next__)
+    def _coro_finished(self):
+        return self._coroutine.cr_frame is None
 
-    def asend(self, value):
-        return ANextIter(self._it, self._it.send, value)
+    def _coro_started(self):
+        return (self._coroutine.cr_frame is None
+                or self._coroutine.cr_frame.f_lasti != -1)
 
-    def athrow(self, *args):
-        return ANextIter(self._it, self._it.throw, *args)
+    ################################################################
+    # Core functionality
+    ################################################################
 
-    def _coro_running(self):
-        # This is a trick to tell whether the coroutine was left
-        # partially-complete -- if it hasn't started yet, then it isn't
-        # awaiting on anything; if it's finished, then it isn't awaiting on
-        # anything; but if it's in the middle of running, then it's always
-        # awaiting on something.
-        return self._coroutine.cr_await is not None
+    async def __anext__(self):
+        if self._delegate is not None:
+            return await self._do_delegate(type(self._delegate).__anext__)
+        else:
+            return await self._do_it(self._it.__next__)
+
+    async def asend(self, value):
+        if self._delegate is not None:
+            return await self._do_delegate(type(self._delegate).asend, value)
+        else:
+            return await self._do_it(self._it.send, value)
+
+    async def athrow(self, *args):
+        if self._delegate is not None:
+            return await self._do_delegate(type(self._delegate).athrow, *args)
+        else:
+            return await self._do_it(self._it.throw, *args)
+
+    async def _do_delegate(self, delegate_fn, *args):
+        assert not self._coro_finished()
+        assert self._delegate is not None
+        try:
+            return await delegate_fn(self._delegate, *args)
+        except StopAsyncIteration as e:
+            self._delegate = None
+            return await self.asend(e.args[0])
+        except:
+            self._delegate = None
+            return await self.athrow(*sys.exc_info())
+
+    async def _do_it(self, start_fn, *args):
+        assert self._delegate is None
+        # On CPython 3.5.2 (but not 3.5.0), coroutines get cranky if you try
+        # to iterate them after they're exhausted. Generators OTOH just raise
+        # StopIteration. We want to convert the one into the other, so we need
+        # to avoid iterating stopped coroutines.
+        if self._coro_finished():
+            raise StopAsyncIteration()
+        result = await ANextIter(self._it, start_fn, *args)
+        if type(result) is YieldFromWrapper:
+            self._delegate = result.payload
+            return await self.__anext__()
+        else:
+            return result
+
+    ################################################################
+    # Cleanup
+    ################################################################
 
     async def aclose(self):
-        if not self._coro_running():
+        if not self._coro_started():
             # Make sure that aclose() on an unstarted generator returns
             # successfully and prevents future iteration.
             self._it.close()
+            return
+        if self._coro_finished():
             return
         try:
             await self.athrow(GeneratorExit)
@@ -136,7 +181,7 @@ class AsyncGenerator:
             raise RuntimeError("async_generator ignored GeneratorExit")
 
     def __del__(self):
-        if self._coro_running():
+        if self._coro_started() and not self._coro_finished():
             # This exception will get swallowed because this is __del__, but
             # it's an easy way to trigger the print-to-console logic
             raise RuntimeError(

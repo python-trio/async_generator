@@ -2,7 +2,7 @@ import types
 import asyncio
 import pytest
 
-from . import async_generator, yield_
+from . import async_generator, yield_, yield_from_
 
 # like list(it) but works on async iterators
 async def collect(ait):
@@ -50,7 +50,7 @@ async def test_async_generator():
 
 ################################################################
 #
-# async_generators must return None
+# async_generators return value
 #
 ################################################################
 
@@ -69,9 +69,10 @@ async def test_bad_return_value():
     async for item in gen:
         assert item == 2
         break
-    with pytest.raises(RuntimeError):
-        async for item in gen:
-            assert False   # pragma: no cover
+    try:
+        await gen.__anext__()
+    except StopAsyncIteration as e:
+        assert e.args[0] == "hi"
 
 ################################################################
 #
@@ -256,16 +257,52 @@ async def test_aclose_yielding():
 #
 ################################################################
 
-# XX disabled for now, see README
-# # Test yield_from_
-# @async_generator
-# async def async_range_twice(count):
-#     await yield_from_(async_range(count))
-#     await yield_(None)
-#     await yield_from_(async_range(count))
-#
-# @pytest.mark.asyncio
-# async def test_async_yield_from_():
-#     assert await collect(async_range_twice(3)) == [
-#         0, 1, 2, None, 0, 1, 2,
-#     ]
+@async_generator
+async def async_range_twice(count):
+    await yield_from_(async_range(count))
+    await yield_(None)
+    await yield_from_(async_range(count))
+
+@pytest.mark.asyncio
+async def test_async_yield_from_():
+    assert await collect(async_range_twice(3)) == [
+        0, 1, 2, None, 0, 1, 2,
+    ]
+
+@async_generator
+async def doubles_sends(value):
+    while True:
+        value = await yield_(2 * value)
+
+@async_generator
+async def wraps_doubles_sends(value):
+    await yield_from_(doubles_sends(value))
+
+@pytest.mark.asyncio
+async def test_async_yield_from_asend():
+    gen = wraps_doubles_sends(10)
+    await gen.__anext__() == 20
+    assert (await gen.asend(2)) == 4
+    assert (await gen.asend(5)) == 10
+    assert (await gen.asend(0)) == 0
+    await gen.aclose()
+
+@pytest.mark.asyncio
+async def test_async_yield_from_athrow():
+    gen = async_range_twice(2)
+    assert (await gen.__anext__()) == 0
+    with pytest.raises(ValueError):
+        await gen.athrow(ValueError)
+
+@async_generator
+async def returns_1():
+    await yield_(0)
+    return 1
+
+@async_generator
+async def yields_from_returns_1():
+    await yield_(await yield_from_(returns_1()))
+
+@pytest.mark.asyncio
+async def test_async_yield_from_return_value():
+    assert await collect(yields_from_returns_1()) == [0, 1]
