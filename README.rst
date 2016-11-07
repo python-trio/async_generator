@@ -62,12 +62,28 @@ to decorate your async generators with ``@async_generator``, and
 instead of writing ``async yield x`` you write ``await yield_(x)``::
 
    # Same example as before, but works in Python 3.5
-   from async_generator import async_generator, yield_
+   from async_generator import async_generator, yield_, yield_from_
 
    @async_generator
    async def load_json_lines(asyncio_stream_reader):
        async for line in asyncio_stream_reader:
            await yield_(json.loads(line))
+
+yield from
+==========
+
+Starting in 3.6, CPython has native support for async generators. But,
+it still doesn't support ``yield from``. This library does. It looks
+like::
+
+   @async_generator
+   async def wrap_load_json_lines(asyncio_stream_reader):
+       await yield_from_(load_json_lines(asyncio_stream_reader))
+
+The ``await yield_from_(...)`` construction can be applied to any
+async iterator, including class-based iterators, native async
+generators, and async generators created using this library, and fully
+supports the classic ``yield from`` semantics.
 
 
 Semantics
@@ -75,10 +91,11 @@ Semantics
 
 This library generally follows `PEP 525
 <https://www.python.org/dev/peps/pep-0525/>`__ semantics ("as seen in
-Python 3.6!"), except that it doesn't currently support the
-``sys.{get,set}_asyncgen_hooks`` garbage collection API. The main
-reason for this is that officially, only built-in generators are
-allowed to use that, and that's not us. In any case, you probably
+Python 3.6!"), except that it adds ``yield from`` support, and it
+doesn't currently support the ``sys.{get,set}_asyncgen_hooks`` garbage
+collection API. There are two main reasons for this: (a) it doesn't
+exist on Python 3.5, and (b) even on 3.6, only built-in generators are
+supposed to use that API, and that's not us. In any case, you probably
 shouldn't be relying on garbage collection for async generators – see
 `this discussion
 <https://vorpus.org/blog/some-thoughts-on-asynchronous-api-design-in-a-post-asyncawait-world/#cleanup-in-generators-and-async-generators>`__
@@ -93,6 +110,7 @@ Changes
 ----------------
 
 * Support for ``asend``\/``athrow``\/``aclose``
+* Support for ``yield from``
 * Add a ``__del__`` method that complains about improperly cleaned up
   async generators.
 * Adapt to `the change in Python 3.5.2
