@@ -78,9 +78,12 @@ This library generally follows `PEP 525
 Python 3.6!"), except that it doesn't currently support the
 ``sys.{get,set}_asyncgen_hooks`` garbage collection API. The main
 reason for this is that officially, only built-in generators are
-allowed to use that, and that's not us. You probably shouldn't be
-relying on this anyway (see `PEP 533
-<https://www.python.org/dev/peps/pep-0533/>`__).
+allowed to use that, and that's not us. In any case, you probably
+shouldn't be relying on garbage collection for async generators – see
+`this discussion
+<https://vorpus.org/blog/some-thoughts-on-asynchronous-api-design-in-a-post-asyncawait-world/#cleanup-in-generators-and-async-generators>`__
+and `PEP 533 <https://www.python.org/dev/peps/pep-0533/>`__ for more
+details.
 
 
 Changes
