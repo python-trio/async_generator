@@ -142,7 +142,50 @@ def test_yield_different_entries():
 
 ################################################################
 #
-# close
+# asend
+#
+################################################################
+
+@async_generator
+async def asend_me():
+    assert (await yield_(1)) == 2
+    assert (await yield_(3)) == 4
+
+@pytest.mark.asyncio
+async def test_asend():
+    aiter = asend_me()
+    assert (await aiter.__anext__()) == 1
+    assert (await aiter.asend(2)) == 3
+    with pytest.raises(StopAsyncIteration):
+        await aiter.asend(4)
+
+
+################################################################
+#
+# athrow
+#
+################################################################
+
+@async_generator
+async def athrow_me():
+    with pytest.raises(KeyError):
+        await yield_(1)
+    with pytest.raises(ValueError):
+        await yield_(2)
+    await yield_(3)
+
+@pytest.mark.asyncio
+async def test_athrow():
+    aiter = athrow_me()
+    assert (await aiter.__anext__()) == 1
+    assert (await aiter.athrow(KeyError("oops"))) == 2
+    assert (await aiter.athrow(ValueError("oops"))) == 3
+    with pytest.raises(OSError):
+        await aiter.athrow(OSError("oops"))
+
+################################################################
+#
+# aclose
 #
 ################################################################
 
@@ -157,15 +200,55 @@ async def close_me_aiter(track):
         track[0] = "wtf"
 
 @pytest.mark.asyncio
-async def test_close():
+async def test_aclose():
     track = [None]
     aiter = close_me_aiter(track)
     async for obj in aiter:
         assert obj == 1
         break
     assert track[0] is None
-    aiter.close()
+    await aiter.aclose()
     assert track[0] == "closed"
+
+@pytest.mark.asyncio
+async def test_aclose_on_unstarted_generator():
+    aiter = close_me_aiter([None])
+    await aiter.aclose()
+    async for obj in aiter:
+        assert False
+
+@pytest.mark.asyncio
+async def test_aclose_on_finished_generator():
+    aiter = async_range(3)
+    async for obj in aiter:
+        pass
+    await aiter.aclose()
+
+@async_generator
+async def sync_yield_during_aclose():
+    try:
+        await yield_(1)
+    finally:
+        await asyncio.sleep(0)
+
+@async_generator
+async def async_yield_during_aclose():
+    try:
+        await yield_(1)
+    finally:
+        await yield_(2)
+
+@pytest.mark.asyncio
+async def test_aclose_yielding():
+    aiter = sync_yield_during_aclose()
+    assert (await aiter.__anext__()) == 1
+    # Doesn't raise:
+    await aiter.aclose()
+
+    aiter = async_yield_during_aclose()
+    assert (await aiter.__anext__()) == 1
+    with pytest.raises(RuntimeError):
+        await aiter.aclose()
 
 ################################################################
 #

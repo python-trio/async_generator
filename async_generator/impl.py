@@ -20,24 +20,56 @@ def _yield_(value):
 async def yield_(value):
     return await _yield_(value)
 
-# Sneaky trick: we *don't* have to decorate this with @async_generator or
-# anything like that, because unlike a real 'yield', our yield_ will actually
-# propagate out *through* our caller to *their* @async_generator, so it's like
-# this async for loop happens directly inside the body of our caller. (If we
-# wanted to support 'asend' / 'athrow', similar to how real 'yield from'
-# forwards 'send' / 'throw', then life would be much more complicated.)
-# XX disabled for now -- see README for details
-# async def yield_from_(aiter):
-#     async for item in aiter:
-#         await yield_(item)
+# class YieldFromWrapper:
+#     def __init__(self, payload):
+#         self.payload = payload
+#
+# @coroutine
+# def _yield_from_(delegate):
+#     return (yield YieldFromWrapper(delegate))
+#
+# async def yield_from_(delegate):
+#     delegate = type(delegate).__aiter__()
+#     if sys.version_info < (3, 5, 2):
+#         delegate = await delegate
+#     return await _yield_from_(delegate)
 
-# This is the awaitable / iterator returned from asynciter.__anext__()
+# This is the awaitable / iterator returned from asynciter.__anext__() and
+# friends.
+#
+# Note: we can be sloppy about the distinction between
+#
+#   type(self._it).__next__(self._it)
+#
+# and
+#
+#   self._it.__next__()
+#
+# because we happen to know that self._it is not a general iterator object,
+# but specifically a coroutine iterator object where these are equivalent.
 class ANextIter:
-    def __init__(self, it):
+    def __init__(self, it, first_fn, *first_args):
         self._it = it
+        self._first_fn = first_fn
+        self._first_args = first_args
 
     def __await__(self):
         return self
+
+    def __next__(self):
+        if self._first_fn is not None:
+            first_fn = self._first_fn
+            first_args = self._first_args
+            self._first_fn = self._first_args = None
+            return self._invoke(first_fn, *first_args)
+        else:
+            return self._invoke(self._it.__next__)
+
+    def send(self, value):
+        return self._invoke(self._it.send, value)
+
+    def throw(self, type, value=None, traceback=None):
+        return self._invoke(self._it.throw, type, value, traceback)
 
     def _invoke(self, fn, *args):
         try:
@@ -54,21 +86,10 @@ class ANextIter:
         else:
             return result
 
-    def __next__(self):
-        return self._invoke(self._it.__next__)
-
-    def send(self, value):
-        return self._invoke(self._it.send, value)
-
-    def throw(self, type, value=None, traceback=None):
-        return self._invoke(self._it.throw, type, value, traceback)
-
-    def close(self):
-        return self._it.close()
-
 class AsyncGenerator:
     def __init__(self, coroutine):
-        self._anext_iter = ANextIter(coroutine.__await__())
+        self._coroutine = coroutine
+        self._it = type(coroutine).__await__(coroutine)
 
     # On python 3.5.0 and 3.5.1, __aiter__ must be awaitable.
     # Starting in 3.5.2, it should not be awaitable, and if it is, then it
@@ -85,10 +106,41 @@ class AsyncGenerator:
             return self
 
     def __anext__(self):
-        return self._anext_iter
+        return ANextIter(self._it, self._it.__next__)
 
-    def close(self):
-        return self._anext_iter.close()
+    def asend(self, value):
+        return ANextIter(self._it, self._it.send, value)
+
+    def athrow(self, *args):
+        return ANextIter(self._it, self._it.throw, *args)
+
+    def _coro_running(self):
+        # This is a trick to tell whether the coroutine was left
+        # partially-complete -- if it hasn't started yet, then it isn't
+        # awaiting on anything; if it's finished, then it isn't awaiting on
+        # anything; but if it's in the middle of running, then it's always
+        # awaiting on something.
+        return self._coroutine.cr_await is not None
+
+    async def aclose(self):
+        if not self._coro_running():
+            # Make sure that aclose() on an unstarted generator returns
+            # successfully and prevents future iteration.
+            self._it.close()
+            return
+        try:
+            await self.athrow(GeneratorExit)
+        except (GeneratorExit, StopAsyncIteration):
+            pass
+        else:
+            raise RuntimeError("async_generator ignored GeneratorExit")
+
+    def __del__(self):
+        if self._coro_running():
+            # This exception will get swallowed because this is __del__, but
+            # it's an easy way to trigger the print-to-console logic
+            raise RuntimeError(
+                "partially-exhausted async_generator garbage collected")
 
 def async_generator(coroutine_maker):
     @wraps(coroutine_maker)

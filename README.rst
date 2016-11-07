@@ -73,97 +73,14 @@ instead of writing ``async yield x`` you write ``await yield_(x)``::
 Semantics
 =========
 
-In addition to being *super handy*, this library is intended to help
-us get some experience with writing and using async generators, so
-that we can figure out exactly what semantics they should have, in
-hopes of getting them added to the language properly in ~3.6/3.7. So
-here are some notes on the exact design decisions taken (for now):
-
-
-``send``, ``throw``, ``yield from``
------------------------------------
-
-We *do not* implement any async equivalent to regular generators'
-  ``send`` and ``throw``. ``await yield_(...)`` always returns
-  ``None``.
-
-We *do not* implement any kind of ``async yield from ...``.
-
-This isn't because these features are uninteresting. Recall that
-``yield from`` isn't just useful as a trick for implementing async
-coroutines -- it was `originally motivated
-<https://www.python.org/dev/peps/pep-0380/>`_ as a way to allow
-complex generators to be refactored into multiple pieces, and that
-rationale applies equally for async generators. It's not as clear
-whether asynchronous ``asend(...)`` and ``athrow(...)`` methods are
-really compelling -- though one use case would be that if we start
-implementing network protocols as async generators that do ``async for
-...`` to read and ``async yield ...`` to write, then it is nice if the
-write operation has a way to signal an error!
-
-But, there are two reasons why we nonetheless leave these out (for
-now): (a) It'd be easy for this library to implement either *one* of
-these features, but implementing both of them is substantially more
-difficult, and it isn't clear which is more useful. (b) It might be
-extremely difficult for CPython to natively implement either of these
-features at all, and we don't want that to block getting the basic
-feature implemented. By leaving these features out we can get some
-data on just how useful they really are.
-
-
-Return values
--------------
-
-Async generators must return ``None`` (for example, by falling off the
-bottom of the function body). If they don't then we raise a
-``RuntimeError``. (Rationale: it would be easy to put the return value
-into the ``StopAsyncIteration`` exception, similar to how return
-values in regular generators are carried in ``StopIteration``
-exceptions. But there isn't much point, because generator return
-values are really only useful with ``yield from``, and we don't
-support ``yield from``. And making it an error lets us keep our
-options open for the future.)
-
-
-``close``
----------
-
-Async generators have a ``.close()`` method. This is a regular method,
-not an async method -- call it like ``ait.close()``, *not* ``await
-ait.close()``.
-
-This is important to allow resources to be freed promptly from an
-iterator that will never be exhausted. For example, imagine that we
-have an asynchronous WSGI-like API where some code reads from an
-asynchronous iterator, and sends the data on somewhere else::
-
-  async def f():
-      ait = ...
-      async for data in ait:
-          await send(data)
-
-And now suppose that ``send(...)`` fails, perhaps because the remote
-side closed the connection. When this happens, we want to let the
-asynchronous iterator know that we will never finish iterating over
-it. So a better way to write this code is::
-
-  async def f():
-      ait = ...
-      try:
-          async for data in ait:
-              await send(data)
-      finally:
-          ait.close()
-
-or perhaps::
-
-  async def f():
-      with contextlib.closing(...) as ait:
-          async for data in ait:
-              await send(data)
-
-This is a non-async method because it may be called from ``__del__``
-methods, when no coroutine runner is available.
+This library generally follows `PEP 525
+<https://www.python.org/dev/peps/pep-0525/>`__ semantics ("as seen in
+Python 3.6!"), except that it doesn't currently support the
+``sys.{get,set}_asyncgen_hooks`` garbage collection API. The main
+reason for this is that officially, only built-in generators are
+allowed to use that, and that's not us. You probably shouldn't be
+relying on this anyway (see `PEP 533
+<https://www.python.org/dev/peps/pep-0533/>`__).
 
 
 Changes
@@ -172,7 +89,9 @@ Changes
 1.1 (????-??-??)
 ----------------
 
-* Expose ``.close()`` method on async generators.
+* Support for ``asend``\/``athrow``\/``aclose``
+* Add a ``__del__`` method that complains about improperly cleaned up
+  async generators.
 * Adapt to `the change in Python 3.5.2
   <https://www.python.org/dev/peps/pep-0492/#api-design-and-implementation-revisions>`_
   where ``__aiter__`` should now be a regular method instead of an
