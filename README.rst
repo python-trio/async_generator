@@ -131,8 +131,8 @@ generators, and async generators created using this library, and fully
 supports the classic ``yield from`` semantics.
 
 In fact, if you're using CPython 3.6 native generators, you can even
-use this libraries ``yield_from_`` *directly inside a native
-generator*:
+use this library's ``yield_from_`` *directly inside a native
+generator*. For example, this totally works (if you're on 3.6):
 
 .. code-block:: python3
 
@@ -150,7 +150,16 @@ There are two limitations to watch out for, though:
 * You can't write a native async generator that *only* contains
   ``yield_from_`` calls; it has to contain at least one real ``yield``
   or else the Python compiler won't know that you're trying to write
-  an async generator and you'll get extremely weird results.
+  an async generator and you'll get extremely weird results. For
+  example, this won't work:
+
+  .. code-block:: python3
+
+     async def wrap_load_json_lines(asyncio_stream_reader):
+         await yield_from_(load_json_lines(asyncio_stream_reader))
+
+  The solution is either to convert it into an ``@async_generator``,
+  or else add a ``yield`` expression somewhere.
 
 * You can't return values from native async generators. So this
   doesn't work:
