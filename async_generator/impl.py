@@ -9,12 +9,48 @@ class YieldWrapper:
     def __init__(self, payload):
         self.payload = payload
 
+if sys.version_info < (3, 6):
+    def _wrap(value):
+        return YieldWrapper(value)
+
+    def _is_wrapped(box):
+        return isinstance(box, YieldWrapper)
+
+    def _unwrap(box):
+        return box.payload
+else:
+    # Use the same box type that the interpreter uses internally. This allows
+    # yield_ and (more importantly!) yield_from_ to work in built-in
+    # generators.
+    import ctypes # mua ha ha.
+    dll = ctypes.CDLL(None)
+
+    dll._PyAsyncGenValueWrapperNew.restype = ctypes.py_object
+    dll._PyAsyncGenValueWrapperNew.argtypes = (ctypes.py_object,)
+    def _wrap(value):
+        return dll._PyAsyncGenValueWrapperNew(value)
+
+    _PyAsyncGenWrappedValue = type(_wrap(1))
+    def _is_wrapped(box):
+        return isinstance(box, _PyAsyncGenWrappedValue)
+
+    class _ctypes_PyAsyncGenWrappedValue(ctypes.Structure):
+        _fields_ = [
+            ('PyObject_HEAD', ctypes.c_byte * object().__sizeof__()),
+            ('agw_val', ctypes.py_object),
+        ]
+    def _unwrap(box):
+        assert _is_wrapped(box)
+        raw = ctypes.cast(ctypes.c_void_p(id(box)),
+                          ctypes.POINTER(_ctypes_PyAsyncGenWrappedValue))
+        return raw.contents.agw_val
+
 # The magic @coroutine decorator is how you write the bottom level of
 # coroutine stacks -- 'async def' can only use 'await' = yield from; but
 # eventually we must bottom out in a @coroutine that calls plain 'yield'.
 @coroutine
 def _yield_(value):
-    return (yield YieldWrapper(value))
+    return (yield _wrap(value))
 
 # But we wrap the bare @coroutine version in an async def, because async def
 # has the magic feature that users can get warnings messages if they forget to
@@ -34,13 +70,18 @@ async def yield_from_(delegate):
     # back to the @async_generator wrapper. So even though we're a regular
     # function, we can directly yield values out of the calling async
     # generator.
+    def unpack_StopAsyncIteration(e):
+        if e.args:
+            return e.args[0]
+        else:
+            return None
     _i = type(delegate).__aiter__(delegate)
     if sys.version_info < (3, 5, 2):
         _i = await _i
     try:
         _y = await type(_i).__anext__(_i)
     except StopAsyncIteration as _e:
-        _r = _e.args[0]
+        _r = unpack_StopAsyncIteration(_e)
     else:
         while 1:
             try:
@@ -63,8 +104,7 @@ async def yield_from_(delegate):
                     try:
                         _y = await _m(*_x)
                     except StopAsyncIteration as _e:
-                        _r = _e.args[0]
-                        break
+                        _r = unpack_StopAsyncIteration(_e)
             else:
                 try:
                     if _s is None:
@@ -72,7 +112,7 @@ async def yield_from_(delegate):
                     else:
                         _y = await _i.asend(_s)
                 except StopAsyncIteration as _e:
-                    _r = _e.args[0]
+                    _r = unpack_StopAsyncIteration(_e)
                     break
     return _r
 
@@ -120,8 +160,8 @@ class ANextIter:
             # The underlying generator returned, so we should signal the end
             # of iteration.
             raise StopAsyncIteration(e.value)
-        if isinstance(result, YieldWrapper):
-            raise StopIteration(result.payload)
+        if _is_wrapped(result):
+            raise StopIteration(_unwrap(result))
         else:
             return result
 
