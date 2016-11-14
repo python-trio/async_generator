@@ -327,6 +327,104 @@ async def yields_from_returns_1():
 async def test_async_yield_from_return_value():
     assert await collect(yields_from_returns_1()) == [0, 1]
 
+# Special cases to get coverage
+@pytest.mark.asyncio
+async def test_yield_from_empty():
+    @async_generator
+    async def empty():
+        return "done"
+
+    @async_generator
+    async def yield_from_empty():
+        assert (await yield_from_(empty())) == "done"
+
+    assert await collect(yield_from_empty()) == []
+
+@pytest.mark.asyncio
+async def test_yield_from_non_generator():
+    class Countdown:
+        def __init__(self, count):
+            self.count = count
+            self.closed = False
+
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self):
+            self.count -= 1
+            if self.count < 0:
+                raise StopAsyncIteration("boom")
+            return self.count
+
+        async def aclose(self):
+            self.closed = True
+
+    @async_generator
+    async def yield_from_countdown(count, happenings):
+        try:
+            c = Countdown(count)
+            assert (await yield_from_(c)) == "boom"
+        except BaseException as e:
+            if c.closed:
+                happenings.append("countdown closed")
+            happenings.append("raise")
+            return e
+    h = []
+    assert await collect(yield_from_countdown(3, h)) == [2, 1, 0]
+    assert h == []
+
+    # Throwing into a yield_from_(object with no athrow) just raises the
+    # exception in the generator.
+    h = []
+    agen = yield_from_countdown(3, h)
+    assert await agen.__anext__() == 2
+    exc = ValueError("x")
+    try:
+        await agen.athrow(exc)
+    except StopAsyncIteration as e:
+        assert e.args[0] is exc
+    assert h == ["raise"]
+
+    # Calling aclose on the generator calls aclose on the iterator
+    h = []
+    agen = yield_from_countdown(3, h)
+    assert await agen.__anext__() == 2
+    await agen.aclose()
+    assert h == ["countdown closed", "raise"]
+
+    # Throwing GeneratorExit into the generator calls *aclose* on the iterator
+    # (!)
+    h = []
+    agen = yield_from_countdown(3, h)
+    assert await agen.__anext__() == 2
+    exc = GeneratorExit()
+    with pytest.raises(StopAsyncIteration):
+        await agen.athrow(exc)
+    assert h == ["countdown closed", "raise"]
+
+@pytest.mark.asyncio
+async def test_yield_from_athrow_raises_StopAsyncIteration():
+    @async_generator
+    async def catch():
+        try:
+            while True:
+                await yield_("hi")
+        except Exception as exc:
+            return ("bye", exc)
+
+    @async_generator
+    async def yield_from_catch():
+        return await yield_from_(catch())
+
+    agen = yield_from_catch()
+    assert await agen.__anext__() == "hi"
+    assert await agen.__anext__() == "hi"
+    thrown = ValueError("oops")
+    try:
+        await agen.athrow(thrown)
+    except StopAsyncIteration as caught:
+        assert caught.args == (("bye", thrown),)
+
 ################################################################
 # __del__
 ################################################################

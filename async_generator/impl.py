@@ -199,7 +199,13 @@ class AsyncGenerator:
         return await self._do_it(self._it.send, value)
 
     async def athrow(self, type, value=None, traceback=None):
-        return await self._do_it(self._it.throw, type, value, traceback)
+        try:
+            return await self._do_it(self._it.throw, type, value, traceback)
+        except BaseException as e:
+            print("??", e.__class__, e)
+            raise
+        finally:
+            print("xx")
 
     async def _do_it(self, start_fn, *args):
         # On CPython 3.5.2 (but not 3.5.0), coroutines get cranky if you try
