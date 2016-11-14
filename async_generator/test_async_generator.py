@@ -347,8 +347,12 @@ async def test_yield_from_non_generator():
             self.count = count
             self.closed = False
 
-        def __aiter__(self):
-            return self
+        if sys.version_info < (3, 5, 2):
+            async def __aiter__(self):
+                return self
+        else:
+            def __aiter__(self):
+                return self
 
         async def __anext__(self):
             self.count -= 1
