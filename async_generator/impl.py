@@ -22,21 +22,59 @@ def _yield_(value):
 async def yield_(value):
     return await _yield_(value)
 
-# This is a little tricky -- when we see a yield_from, we actually yield_ a
-# magic object (NOT yield! yield_!). The way this works is that the ANextIter
-# layer doesn't have to worry about yield from -- it gets invoked to run a
-# single round of the underlying coroutine until it hits a yield_ or
-# yield_from_, and then the next layer up (inside AsyncGenerator) takes care
-# of the yield_from_ part.
-class YieldFromWrapper:
-    def __init__(self, payload):
-        self.payload = payload
-
 async def yield_from_(delegate):
-    delegate = type(delegate).__aiter__(delegate)
+    # Transcribed with adaptations from:
+    #
+    #   https://www.python.org/dev/peps/pep-0380/#formal-semantics
+    #
+    # This takes advantage of a sneaky trick: if an @async_generator-wrapped
+    # function calls another async function (like yield_from_), and that
+    # second async function calls yield_, then because of the hack we use to
+    # implement yield_, the yield_ will actually propagate through yield_from_
+    # back to the @async_generator wrapper. So even though we're a regular
+    # function, we can directly yield values out of the calling async
+    # generator.
+    _i = type(delegate).__aiter__(delegate)
     if sys.version_info < (3, 5, 2):
-        delegate = await delegate
-    return await yield_(YieldFromWrapper(delegate))
+        _i = await _i
+    try:
+        _y = await type(_i).__anext__(_i)
+    except StopAsyncIteration as _e:
+        _r = _e.args[0]
+    else:
+        while 1:
+            try:
+                _s = await yield_(_y)
+            except GeneratorExit as _e:
+                try:
+                    _m = _i.aclose
+                except AttributeError:
+                    pass
+                else:
+                    await _m()
+                raise _e
+            except BaseException as _e:
+                _x = sys.exc_info()
+                try:
+                    _m = _i.athrow
+                except AttributeError:
+                    raise _e
+                else:
+                    try:
+                        _y = await _m(*_x)
+                    except StopAsyncIteration as _e:
+                        _r = _e.args[0]
+                        break
+            else:
+                try:
+                    if _s is None:
+                        _y = await type(_i).__anext__(_i)
+                    else:
+                        _y = await _i.asend(_s)
+                except StopAsyncIteration as _e:
+                    _r = _e.args[0]
+                    break
+    return _r
 
 # This is the awaitable / iterator that implements asynciter.__anext__() and
 # friends.
@@ -91,7 +129,6 @@ class AsyncGenerator:
     def __init__(self, coroutine):
         self._coroutine = coroutine
         self._it = coroutine.__await__()
-        self._delegate = None
 
     # On python 3.5.0 and 3.5.1, __aiter__ must be awaitable.
     # Starting in 3.5.2, it should not be awaitable, and if it is, then it
@@ -111,49 +148,27 @@ class AsyncGenerator:
     # Core functionality
     ################################################################
 
+    # We make these async functions and use await, rather than just regular
+    # functions that pass back awaitables, in order to get more useful
+    # tracebacks when debugging.
+
     async def __anext__(self):
-        if self._delegate is not None:
-            return await self._do_delegate(type(self._delegate).__anext__)
-        else:
-            return await self._do_it(self._it.__next__)
+        return await self._do_it(self._it.__next__)
 
     async def asend(self, value):
-        if self._delegate is not None:
-            return await self._do_delegate(type(self._delegate).asend, value)
-        else:
-            return await self._do_it(self._it.send, value)
+        return await self._do_it(self._it.send, value)
 
-    async def athrow(self, *args):
-        if self._delegate is not None:
-            return await self._do_delegate(type(self._delegate).athrow, *args)
-        else:
-            return await self._do_it(self._it.throw, *args)
-
-    async def _do_delegate(self, delegate_fn, *args):
-        assert self._delegate is not None
-        try:
-            return await delegate_fn(self._delegate, *args)
-        except StopAsyncIteration as e:
-            self._delegate = None
-            return await self.asend(e.args[0])
-        except:
-            self._delegate = None
-            return await self.athrow(*sys.exc_info())
+    async def athrow(self, type, value=None, traceback=None):
+        return await self._do_it(self._it.throw, type, value, traceback)
 
     async def _do_it(self, start_fn, *args):
-        assert self._delegate is None
         # On CPython 3.5.2 (but not 3.5.0), coroutines get cranky if you try
         # to iterate them after they're exhausted. Generators OTOH just raise
         # StopIteration. We want to convert the one into the other, so we need
         # to avoid iterating stopped coroutines.
         if getcoroutinestate(self._coroutine) is CORO_CLOSED:
             raise StopAsyncIteration()
-        result = await ANextIter(self._it, start_fn, *args)
-        if type(result) is YieldFromWrapper:
-            self._delegate = result.payload
-            return await self.__anext__()
-        else:
-            return result
+        return await ANextIter(self._it, start_fn, *args)
 
     ################################################################
     # Cleanup
