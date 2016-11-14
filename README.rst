@@ -23,7 +23,9 @@ annoying. No-one wants to do that all the time.
 Fortunately, Python has *generators*, which make it easy and
 straightforward to create an *iterator* by writing a *function*. E.g.,
 if you have a file where each line is a JSON document, you can make an
-iterator over the decoded bodies with::
+iterator over the decoded bodies with:
+
+.. code-block:: python3
 
    def load_json_lines(fileobj):
        for line in fileobj:
@@ -44,7 +46,9 @@ example, suppose that in our example above, we want to read the
 documents from a network connection, instead of the local
 filesystem. Using the `asyncio.StreamReader interface
 <https://docs.python.org/3/library/asyncio-stream.html#asyncio.StreamReader>`_
-we can write::
+we can write:
+
+.. code-block:: python3
 
    async def load_json_lines(asyncio_stream_reader):
        async for line in asyncio_stream_reader:
@@ -59,7 +63,9 @@ define ``__aiter__`` and ``__anext__``.
 This is a little library which implements async generators in Python
 3.5, by emulating the above syntax. The two changes are that you have
 to decorate your async generators with ``@async_generator``, and
-instead of writing ``async yield x`` you write ``await yield_(x)``::
+instead of writing ``async yield x`` you write ``await yield_(x)``:
+
+.. code-block:: python3
 
    # Same example as before, but works in Python 3.5
    from async_generator import async_generator, yield_, yield_from_
@@ -95,7 +101,9 @@ async generators. To make this more convenient, this library also
 includes an ``aclosing`` async context manager. It acts just like the
 ``closing`` context manager included in the stdlib ``contextlib``
 module, but does ``await obj.aclose()`` instead of
-``obj.close()``. Use it like this::
+``obj.close()``. Use it like this:
+
+.. code-block:: python3
 
    from async_generator import aclosing
 
@@ -109,7 +117,9 @@ yield from
 
 Starting in 3.6, CPython has native support for async generators. But,
 native async generators still don't support ``yield from``. This
-library does. It looks like::
+library does. It looks like:
+
+.. code-block:: python3
 
    @async_generator
    async def wrap_load_json_lines(asyncio_stream_reader):
@@ -122,7 +132,9 @@ supports the classic ``yield from`` semantics.
 
 In fact, if you're using CPython 3.6 native generators, you can even
 use this libraries ``yield_from_`` *directly inside a native
-generator*::
+generator*:
+
+.. code-block:: python3
 
    async def f():
        yield 2
@@ -141,7 +153,9 @@ There are two limitations to watch out for, though:
   an async generator and you'll get extremely weird results.
 
 * You can't return values from native async generators. So this
-  doesn't work::
+  doesn't work:
+
+  .. code-block:: python3
 
      async def yield_and_return():
          yield 1
