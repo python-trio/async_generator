@@ -69,22 +69,6 @@ instead of writing ``async yield x`` you write ``await yield_(x)``::
        async for line in asyncio_stream_reader:
            await yield_(json.loads(line))
 
-yield from
-==========
-
-Starting in 3.6, CPython has native support for async generators. But,
-it still doesn't support ``yield from``. This library does. It looks
-like::
-
-   @async_generator
-   async def wrap_load_json_lines(asyncio_stream_reader):
-       await yield_from_(load_json_lines(asyncio_stream_reader))
-
-The ``await yield_from_(...)`` construction can be applied to any
-async iterator, including class-based iterators, native async
-generators, and async generators created using this library, and fully
-supports the classic ``yield from`` semantics.
-
 
 Semantics
 =========
@@ -103,8 +87,95 @@ and `PEP 533 <https://www.python.org/dev/peps/pep-0533/>`__ for more
 details.
 
 
+aclosing
+========
+
+As discussed above, you should always explicitly call ``aclose`` on
+async generators. To make this more convenient, this library also
+includes an ``aclosing`` async context manager. It acts just like the
+``closing`` context manager included in the stdlib ``contextlib``
+module, but does ``await obj.aclose()`` instead of
+``obj.close()``. Use it like this::
+
+   from async_generator import aclosing
+
+   async with aclosing(load_json_lines(asyncio_stream_reader)) as agen:
+       async for json_obj in agen:
+           ...
+
+
+yield from
+==========
+
+Starting in 3.6, CPython has native support for async generators. But,
+native async generators still don't support ``yield from``. This
+library does. It looks like::
+
+   @async_generator
+   async def wrap_load_json_lines(asyncio_stream_reader):
+       await yield_from_(load_json_lines(asyncio_stream_reader))
+
+The ``await yield_from_(...)`` construction can be applied to any
+async iterator, including class-based iterators, native async
+generators, and async generators created using this library, and fully
+supports the classic ``yield from`` semantics.
+
+In fact, if you're using CPython 3.6 native generators, you can even
+use this libraries ``yield_from_`` *directly inside a native
+generator*::
+
+   async def f():
+       yield 2
+       yield 3
+
+   async def g():
+       yield 1
+       await yield_from_(f())
+       yield 4
+
+There are two limitations to watch out for, though:
+
+* You can't write a native async generator that *only* contains
+  ``yield_from_`` calls; it has to contain at least one real ``yield``
+  or else the Python compiler won't know that you're trying to write
+  an async generator and you'll get extremely weird results.
+
+* You can't return values from native async generators. So this
+  doesn't work::
+
+     async def yield_and_return():
+         yield 1
+         yield 2
+         # "SyntaxError: 'return' with value in async generator"
+         return "all done"
+
+     async def wrapper():
+         yield "in wrapper"
+         result = await yield_from_(yield_and_return())
+         assert result == "all done"
+
+  The solution is to convert ``yield_and_return`` to an
+  ``@async_generator``::
+
+     @async_generator
+     async def yield_and_return():
+         await yield_(1)
+         await yield_(2)
+         return "all done"
+
 Changes
 =======
+
+1.2 (not yet released)
+----------------------
+
+* Rewrote ``yield from`` support; now has much more accurate handling
+  of edge cases.
+* ``yield_from_`` now works inside CPython 3.6's native async
+  generators.
+* Added ``aclosing`` context manager; it's pretty trivial, but if
+  we're going to recommend it be used everywhere then it seems polite
+  to include it.
 
 1.1 (2016-11-06)
 ----------------
