@@ -52,7 +52,7 @@ we can write:
 
    async def load_json_lines(asyncio_stream_reader):
        async for line in asyncio_stream_reader:
-           async yield json.loads(line)
+           yield json.loads(line)
 
 BUT! the above DOESN'T WORK in Python 3.5 -- you just get a syntax
 error. In 3.5, the only way to make an async generator is to manually
@@ -63,7 +63,7 @@ define ``__aiter__`` and ``__anext__``.
 This is a little library which implements async generators in Python
 3.5, by emulating the above syntax. The two changes are that you have
 to decorate your async generators with ``@async_generator``, and
-instead of writing ``async yield x`` you write ``await yield_(x)``:
+instead of writing ``yield x`` you write ``await yield_(x)``:
 
 .. code-block:: python3
 
