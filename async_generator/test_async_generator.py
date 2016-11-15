@@ -407,6 +407,60 @@ async def test_yield_from_non_generator():
     assert h == ["countdown closed", "raise"]
 
 @pytest.mark.asyncio
+async def test_yield_from_non_generator_with_no_aclose():
+    class Countdown:
+        def __init__(self, count):
+            self.count = count
+            self.closed = False
+
+        if sys.version_info < (3, 5, 2):
+            async def __aiter__(self):
+                return self
+        else:
+            def __aiter__(self):
+                return self
+
+        async def __anext__(self):
+            self.count -= 1
+            if self.count < 0:
+                raise StopAsyncIteration("boom")
+            return self.count
+
+    @async_generator
+    async def yield_from_countdown(count):
+        return await yield_from_(Countdown(count))
+
+    agen = yield_from_countdown(3)
+    assert await agen.__anext__() == 2
+    assert await agen.__anext__() == 1
+    # It's OK that Countdown has no aclose
+    await agen.aclose()
+
+@pytest.mark.asycnio
+async def test_yield_from_with_old_style_aiter():
+    # old-style 'async def __aiter__' should still work even on newer pythons
+    class Countdown:
+        def __init__(self, count):
+            self.count = count
+            self.closed = False
+
+        # This is wrong, that's the point
+        async def __aiter__(self):
+            return self
+
+        async def __anext__(self):
+            self.count -= 1
+            if self.count < 0:
+                raise StopAsyncIteration("boom")
+            return self.count
+
+    @async_generator
+    async def yield_from_countdown(count):
+        return await yield_from_(Countdown(count))
+
+    assert await collect(yield_from_countdown(3)) == [2, 1, 0]
+
+@pytest.mark.asyncio
 async def test_yield_from_athrow_raises_StopAsyncIteration():
     @async_generator
     async def catch():
@@ -425,9 +479,11 @@ async def test_yield_from_athrow_raises_StopAsyncIteration():
     assert await agen.__anext__() == "hi"
     thrown = ValueError("oops")
     try:
-        await agen.athrow(thrown)
+        print(await agen.athrow(thrown))
     except StopAsyncIteration as caught:
         assert caught.args == (("bye", thrown),)
+    else:
+        raise AssertionError
 
 ################################################################
 # __del__

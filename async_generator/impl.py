@@ -105,6 +105,7 @@ async def yield_from_(delegate):
                         _y = await _m(*_x)
                     except StopAsyncIteration as _e:
                         _r = unpack_StopAsyncIteration(_e)
+                        break
             else:
                 try:
                     if _s is None:
@@ -199,13 +200,7 @@ class AsyncGenerator:
         return await self._do_it(self._it.send, value)
 
     async def athrow(self, type, value=None, traceback=None):
-        try:
-            return await self._do_it(self._it.throw, type, value, traceback)
-        except BaseException as e:
-            print("??", e.__class__, e)
-            raise
-        finally:
-            print("xx")
+        return await self._do_it(self._it.throw, type, value, traceback)
 
     async def _do_it(self, start_fn, *args):
         # On CPython 3.5.2 (but not 3.5.0), coroutines get cranky if you try
