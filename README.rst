@@ -189,8 +189,8 @@ There are two limitations to watch out for, though:
 Changes
 =======
 
-1.2 (not yet released)
-----------------------
+1.2 (2016-11-14)
+----------------
 
 * Rewrote ``yield from`` support; now has much more accurate handling
   of edge cases.
@@ -199,6 +199,7 @@ Changes
 * Added ``aclosing`` context manager; it's pretty trivial, but if
   we're going to recommend it be used everywhere then it seems polite
   to include it.
+* 100% test coverage.
 
 1.1 (2016-11-06)
 ----------------
