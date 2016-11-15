@@ -430,6 +430,8 @@ async def test_yield_from_non_generator_with_no_aclose():
     async def yield_from_countdown(count):
         return await yield_from_(Countdown(count))
 
+    assert await collect(yield_from_countdown(3)) == [2, 1, 0]
+
     agen = yield_from_countdown(3)
     assert await agen.__anext__() == 2
     assert await agen.__anext__() == 1
@@ -483,7 +485,7 @@ async def test_yield_from_athrow_raises_StopAsyncIteration():
     except StopAsyncIteration as caught:
         assert caught.args == (("bye", thrown),)
     else:
-        raise AssertionError
+        raise AssertionError  # pragma: no cover
 
 ################################################################
 # __del__
