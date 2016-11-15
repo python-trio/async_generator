@@ -436,7 +436,7 @@ async def test_yield_from_non_generator_with_no_aclose():
     # It's OK that Countdown has no aclose
     await agen.aclose()
 
-@pytest.mark.asycnio
+@pytest.mark.asyncio
 async def test_yield_from_with_old_style_aiter():
     # old-style 'async def __aiter__' should still work even on newer pythons
     class Countdown:

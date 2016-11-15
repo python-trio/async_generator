@@ -76,7 +76,7 @@ async def yield_from_(delegate):
         else:
             return None
     _i = type(delegate).__aiter__(delegate)
-    if sys.version_info < (3, 5, 2):
+    if hasattr(_i, "__await__"):
         _i = await _i
     try:
         _y = await type(_i).__anext__(_i)
