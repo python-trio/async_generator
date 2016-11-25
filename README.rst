@@ -186,8 +186,50 @@ There are two limitations to watch out for, though:
          await yield_(2)
          return "all done"
 
+
+Introspection
+=============
+
+For introspection purposes, we also export the following functions:
+
+* ``async_generator.isasyncgen``: Returns true if passed either an async
+  generator object created by this library, or a native Python 3.6+
+  async generator object. Analogous to ``inspect.isasyncgen`` in 3.6+.
+
+* ``async_generator.isasyncgenfunction``: Returns true if passed
+  either an async generator function created by this library, or a
+  native Python 3.6+ async generator function. Analogous to
+  ``inspect.isasyncgenfunction`` in 3.6+.
+
+Example:
+
+.. code-block:: python3
+
+   >>> isasyncgenfunction(load_json_lines)
+   True
+   >>> gen_object = load_json_lines(asyncio_stream_reader)
+   >>> isasyncgen(gen_object)
+   True
+
+In addition, this library's async generator objects are registered
+with the ``collections.abc.AsyncGenerator`` abstract base class:
+
+.. code-block:: python3
+
+   >>> isinstance(gen_object, collections.abc.AsyncGenerator)
+   True
+
+
 Changes
 =======
+
+1.3 (unreleased)
+----------------
+
+* Added ``isasyncgen`` and ``isasyncgenfunction``.
+* On 3.6, register our async generators with
+  ``collections.abc.AsyncGenerator``.
+
 
 1.2 (2016-11-14)
 ----------------
@@ -200,6 +242,7 @@ Changes
   we're going to recommend it be used everywhere then it seems polite
   to include it.
 * 100% test coverage.
+
 
 1.1 (2016-11-06)
 ----------------

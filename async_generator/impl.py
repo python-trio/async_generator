@@ -2,8 +2,10 @@ import sys
 import warnings
 from functools import wraps
 from types import coroutine
+import inspect
 from inspect import (
     getcoroutinestate, CORO_CREATED, CORO_CLOSED, CORO_SUSPENDED)
+import collections.abc
 
 class YieldWrapper:
     def __init__(self, payload):
@@ -238,8 +240,24 @@ class AsyncGenerator:
             raise RuntimeError(
                 "partially-exhausted async_generator garbage collected")
 
+if hasattr(collections.abc, "AsyncGenerator"):
+    collections.abc.AsyncGenerator.register(AsyncGenerator)
+
 def async_generator(coroutine_maker):
     @wraps(coroutine_maker)
     def async_generator_maker(*args, **kwargs):
         return AsyncGenerator(coroutine_maker(*args, **kwargs))
+    async_generator_maker._is_async_gen_function = True
     return async_generator_maker
+
+def isasyncgen(obj):
+    if hasattr(inspect, "isasyncgen"):
+        if inspect.isasyncgen(obj):
+            return True
+    return isinstance(obj, AsyncGenerator)
+
+def isasyncgenfunction(obj):
+    if hasattr(inspect, "isasyncgenfunction"):
+        if inspect.isasyncgenfunction(obj):
+            return True
+    return getattr(obj, "_is_async_gen_function", False)

@@ -2,8 +2,11 @@ import types
 import sys
 import asyncio
 import pytest
+import collections.abc
 
-from . import async_generator, yield_, yield_from_
+from . import (
+    async_generator, yield_, yield_from_, isasyncgen, isasyncgenfunction,
+)
 
 # like list(it) but works on async iterators
 async def collect(ait):
@@ -518,3 +521,29 @@ async def test___del__():
     # Started, but not exhausted or closed -- big problem
     with pytest.raises(RuntimeError):
         gen.__del__()
+
+
+################################################################
+# introspection
+################################################################
+
+def test_isasyncgen():
+    assert not isasyncgen(async_range)
+    assert isasyncgen(async_range(10))
+
+    if sys.version_info >= (3, 6):
+        assert not isasyncgen(native_async_range)
+        assert isasyncgen(native_async_range(10))
+
+def test_isasyncgenfunction():
+    assert isasyncgenfunction(async_range)
+    assert not isasyncgenfunction(list)
+    assert not isasyncgenfunction(async_range(10))
+
+    if sys.version_info >= (3, 6):
+        assert isasyncgenfunction(native_async_range)
+        assert not isasyncgenfunction(native_async_range(10))
+
+def test_collections_abc_AsyncGenerator():
+    if hasattr(collections.abc, "AsyncGenerator"):
+        assert isinstance(async_range(10), collections.abc.AsyncGenerator)
