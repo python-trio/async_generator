@@ -223,12 +223,13 @@ with the ``collections.abc.AsyncGenerator`` abstract base class:
 Changes
 =======
 
-1.3 (unreleased)
+1.3 (2016-11-24)
 ----------------
 
 * Added ``isasyncgen`` and ``isasyncgenfunction``.
-* On 3.6, register our async generators with
+* On 3.6+, register our async generators with
   ``collections.abc.AsyncGenerator``.
+* 100% test coverage.
 
 
 1.2 (2016-11-14)
