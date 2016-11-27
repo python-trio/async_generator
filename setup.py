@@ -12,7 +12,6 @@ setup(
     license="MIT",
     packages=find_packages(),
     url="https://github.com/njsmith/async_generator",
-    py_modules=["async_generator"],
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
