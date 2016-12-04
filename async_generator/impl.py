@@ -1,5 +1,4 @@
 import sys
-import warnings
 from functools import wraps
 from types import coroutine
 import inspect
