@@ -57,7 +57,7 @@ def _yield_(value):
 # But we wrap the bare @coroutine version in an async def, because async def
 # has the magic feature that users can get warnings messages if they forget to
 # use 'await'.
-async def yield_(value):
+async def yield_(value=None):
     return await _yield_(value)
 
 async def yield_from_(delegate):
