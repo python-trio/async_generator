@@ -8,6 +8,8 @@ setup(
     name="async_generator",
     version=__version__,
     description="Async generators for Python 3.5",
+    # Just in case the cwd is not the root of the source tree, or python is
+    # not set to use utf-8 by default:
     long_description=Path(__file__).with_name("README.rst").read_text('utf-8'),
     author="Nathaniel J. Smith",
     author_email="njs@pobox.com",
