@@ -23,7 +23,7 @@ else:
     # Use the same box type that the interpreter uses internally. This allows
     # yield_ and (more importantly!) yield_from_ to work in built-in
     # generators.
-    import ctypes # mua ha ha.
+    import ctypes  # mua ha ha.
     dll = ctypes.CDLL(None)
 
     dll._PyAsyncGenValueWrapperNew.restype = ctypes.py_object
