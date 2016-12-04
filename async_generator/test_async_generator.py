@@ -52,6 +52,14 @@ async def test_async_generator():
     assert (await collect(tripler.async_multiplied(async_range(5)))
             == [0, 3, 6, 9, 12])
 
+@async_generator
+async def agen_yield_no_arg():
+    await yield_()
+
+@pytest.mark.asyncio
+async def test_yield_no_arg():
+    assert await collect(agen_yield_no_arg()) == [None]
+
 ################################################################
 #
 # async_generators return value
