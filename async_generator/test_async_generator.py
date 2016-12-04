@@ -75,10 +75,10 @@ async def async_gen_with_non_None_return():
 @pytest.mark.asyncio
 async def test_bad_return_value():
     gen = async_gen_with_non_None_return()
-    async for item in gen:
+    async for item in gen:  # pragma: no branch
         assert item == 1
         break
-    async for item in gen:
+    async for item in gen:  # pragma: no branch
         assert item == 2
         break
     try:
@@ -216,7 +216,7 @@ async def close_me_aiter(track):
 async def test_aclose():
     track = [None]
     aiter = close_me_aiter(track)
-    async for obj in aiter:
+    async for obj in aiter:  # pragma: no branch
         assert obj == 1
         break
     assert track[0] is None
