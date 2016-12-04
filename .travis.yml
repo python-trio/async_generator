@@ -10,12 +10,14 @@ before_install:
   - pip install codecov
 
 install:
-  - pip install .
+  - python setup.py sdist --formats=zip
+  - pip install dist/*.zip
 
 script:
   - mkdir empty
   - cd empty
-  - py.test --pyargs async_generator --cov=async_generator --cov-config=.coveragerc
+  - INSTALLDIR=$(python -c "import os, async_generator; print(os.path.dirname(async_generator.__file__))")
+  - py.test --pyargs async_generator --cov="$INSTALLDIR" --cov-config=../.coveragerc
 
 
 after_success:

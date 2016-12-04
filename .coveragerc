@@ -5,7 +5,4 @@ omit=
   setup.py
 
 [report]
-exclude_lines =
-  pragma: no cover
-  ^def test_
 precision = 1
