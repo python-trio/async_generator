@@ -223,6 +223,14 @@ with the ``collections.abc.AsyncGenerator`` abstract base class:
 Changes
 =======
 
+1.4 (2016-12-05)
+----------------
+
+* Allow ``await yield_()`` as an shorthand for ``await yield_(None)``.
+* Small cleanups to setup.py and test infrastructure.
+* 100% test coverage (now including branch coverage!)
+
+
 1.3 (2016-11-24)
 ----------------
 
