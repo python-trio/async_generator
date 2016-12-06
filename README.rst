@@ -226,7 +226,8 @@ Changes
 1.4 (2016-12-05)
 ----------------
 
-* Allow ``await yield_()`` as an shorthand for ``await yield_(None)``.
+* Allow ``await yield_()`` as an shorthand for ``await yield_(None)``
+  (thanks to Alex Grönholm for the suggestion+patch).
 * Small cleanups to setup.py and test infrastructure.
 * 100% test coverage (now including branch coverage!)
 
