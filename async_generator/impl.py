@@ -27,6 +27,9 @@ def _unwrap(box):
 # everywhere, and I'm not sure why -- probably my lack of understanding
 # of ctypes and refcounts.
 #
+# There are also some commented out tests that should be re-enabled if this is
+# fixed:
+#
 # if sys.version_info >= (3, 6):
 #     # Use the same box type that the interpreter uses internally. This allows
 #     # yield_ and (more importantly!) yield_from_ to work in built-in
