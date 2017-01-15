@@ -24,7 +24,7 @@ else:
     # yield_ and (more importantly!) yield_from_ to work in built-in
     # generators.
     import ctypes  # mua ha ha.
-    dll = ctypes.CDLL(None)
+    dll = ctypes.pythonapi
 
     dll._PyAsyncGenValueWrapperNew.restype = ctypes.py_object
     dll._PyAsyncGenValueWrapperNew.argtypes = (ctypes.py_object,)
