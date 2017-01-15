@@ -130,61 +130,62 @@ async iterator, including class-based iterators, native async
 generators, and async generators created using this library, and fully
 supports the classic ``yield from`` semantics.
 
-In fact, if you're using CPython 3.6 native generators, you can even
-use this library's ``yield_from_`` *directly inside a native
-generator*. For example, this totally works (if you're on 3.6):
+..
+   In fact, if you're using CPython 3.6 native generators, you can even
+   use this library's ``yield_from_`` *directly inside a native
+   generator*. For example, this totally works (if you're on 3.6):
 
-.. code-block:: python3
+   .. code-block:: python3
 
-   async def f():
-       yield 2
-       yield 3
+      async def f():
+          yield 2
+          yield 3
 
-   async def g():
-       yield 1
-       await yield_from_(f())
-       yield 4
+      async def g():
+          yield 1
+          await yield_from_(f())
+          yield 4
 
-There are two limitations to watch out for, though:
+   There are two limitations to watch out for, though:
 
-* You can't write a native async generator that *only* contains
-  ``yield_from_`` calls; it has to contain at least one real ``yield``
-  or else the Python compiler won't know that you're trying to write
-  an async generator and you'll get extremely weird results. For
-  example, this won't work:
+   * You can't write a native async generator that *only* contains
+     ``yield_from_`` calls; it has to contain at least one real ``yield``
+     or else the Python compiler won't know that you're trying to write
+     an async generator and you'll get extremely weird results. For
+     example, this won't work:
 
-  .. code-block:: python3
+     .. code-block:: python3
 
-     async def wrap_load_json_lines(asyncio_stream_reader):
-         await yield_from_(load_json_lines(asyncio_stream_reader))
+        async def wrap_load_json_lines(asyncio_stream_reader):
+            await yield_from_(load_json_lines(asyncio_stream_reader))
 
-  The solution is either to convert it into an ``@async_generator``,
-  or else add a ``yield`` expression somewhere.
+     The solution is either to convert it into an ``@async_generator``,
+     or else add a ``yield`` expression somewhere.
 
-* You can't return values from native async generators. So this
-  doesn't work:
+   * You can't return values from native async generators. So this
+     doesn't work:
 
-  .. code-block:: python3
+     .. code-block:: python3
 
-     async def yield_and_return():
-         yield 1
-         yield 2
-         # "SyntaxError: 'return' with value in async generator"
-         return "all done"
+        async def yield_and_return():
+            yield 1
+            yield 2
+            # "SyntaxError: 'return' with value in async generator"
+            return "all done"
 
-     async def wrapper():
-         yield "in wrapper"
-         result = await yield_from_(yield_and_return())
-         assert result == "all done"
+        async def wrapper():
+            yield "in wrapper"
+            result = await yield_from_(yield_and_return())
+            assert result == "all done"
 
-  The solution is to convert ``yield_and_return`` to an
-  ``@async_generator``::
+     The solution is to convert ``yield_and_return`` to an
+     ``@async_generator``::
 
-     @async_generator
-     async def yield_and_return():
-         await yield_(1)
-         await yield_(2)
-         return "all done"
+        @async_generator
+        async def yield_and_return():
+            await yield_(1)
+            await yield_(2)
+            return "all done"
 
 
 Introspection
@@ -222,6 +223,25 @@ with the ``collections.abc.AsyncGenerator`` abstract base class:
 
 Changes
 =======
+
+1.5 (2017-01-15)
+----------------
+
+* Remove (temporarily?) the hacks that let ``yield_`` and
+  ``yield_from_`` work with native async generators. It turns out that
+  due to obscure linking issues this was causing the library to be
+  entirely broken on Python 3.6 on Windows (but not Linux or
+  MacOS). It's probably fixable, but needs some fiddling with ctypes
+  to get the refcounting right, and I couldn't figure it out in the
+  time I had available to spend.
+
+  So in this version, everything that worked before still works with
+  ``@async_generator``-style generators, but uniformly, on all
+  platforms, ``yield_`` and ``yield_from_`` now do *not* work inside
+  native-style async generators.
+* Now running CI testing on Windows as well as Linux.
+* 100% test coverage.
+
 
 1.4 (2016-12-05)
 ----------------

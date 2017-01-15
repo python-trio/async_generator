@@ -555,3 +555,39 @@ def test_isasyncgenfunction():
 def test_collections_abc_AsyncGenerator():
     if hasattr(collections.abc, "AsyncGenerator"):
         assert isinstance(async_range(10), collections.abc.AsyncGenerator)
+
+
+################################################################
+# Finicky tests to check that the overly clever ctype stuff has plausible
+# refcounting
+
+from . import impl
+
+def test_refcnt():
+    x = object()
+    print(sys.getrefcount(x))
+    print(sys.getrefcount(x))
+    print(sys.getrefcount(x))
+    print(sys.getrefcount(x))
+    base_count = sys.getrefcount(x)
+    l = [impl._wrap(x) for _ in range(100)]
+    print(sys.getrefcount(x))
+    print(sys.getrefcount(x))
+    print(sys.getrefcount(x))
+    assert sys.getrefcount(x) >= base_count + 100
+    l2 = [impl._unwrap(box) for box in l]
+    assert sys.getrefcount(x) >= base_count + 200
+    print(sys.getrefcount(x))
+    print(sys.getrefcount(x))
+    print(sys.getrefcount(x))
+    print(sys.getrefcount(x))
+    del l
+    print(sys.getrefcount(x))
+    print(sys.getrefcount(x))
+    print(sys.getrefcount(x))
+    del l2
+    print(sys.getrefcount(x))
+    print(sys.getrefcount(x))
+    print(sys.getrefcount(x))
+    assert sys.getrefcount(x) == base_count
+    print(sys.getrefcount(x))

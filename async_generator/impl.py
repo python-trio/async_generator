@@ -10,41 +10,77 @@ class YieldWrapper:
     def __init__(self, payload):
         self.payload = payload
 
-if sys.version_info < (3, 6):
-    def _wrap(value):
-        return YieldWrapper(value)
+def _wrap(value):
+    return YieldWrapper(value)
 
-    def _is_wrapped(box):
-        return isinstance(box, YieldWrapper)
+def _is_wrapped(box):
+    return isinstance(box, YieldWrapper)
 
-    def _unwrap(box):
-        return box.payload
-else:
-    # Use the same box type that the interpreter uses internally. This allows
-    # yield_ and (more importantly!) yield_from_ to work in built-in
-    # generators.
-    import ctypes  # mua ha ha.
-    dll = ctypes.pythonapi
+def _unwrap(box):
+    return box.payload
 
-    dll._PyAsyncGenValueWrapperNew.restype = ctypes.py_object
-    dll._PyAsyncGenValueWrapperNew.argtypes = (ctypes.py_object,)
-    def _wrap(value):
-        return dll._PyAsyncGenValueWrapperNew(value)
+# This is the magic code that lets you use yield_ and yield_from_ with native
+# generators.
+#
+# The old version worked great on Linux and MacOS, but not on Windows, because
+# it depended on _PyAsyncGenValueWrapperNew. The new version segfaults
+# everywhere, and I'm not sure why -- probably my lack of understanding
+# of ctypes and refcounts.
+#
+# if sys.version_info >= (3, 6):
+#     # Use the same box type that the interpreter uses internally. This allows
+#     # yield_ and (more importantly!) yield_from_ to work in built-in
+#     # generators.
+#     import ctypes  # mua ha ha.
+#
+#     # We used to call _PyAsyncGenValueWrapperNew to create and set up new
+#     # wrapper objects, but that symbol isn't available on Windows:
+#     #
+#     #   https://github.com/njsmith/async_generator/issues/5
+#     #
+#     # Fortunately, the type object is available, but it means we have to do
+#     # this the hard way.
+#
+#     # We don't actually need to access this, but we need to make a ctypes
+#     # structure so we can call addressof.
+#     class _ctypes_PyTypeObject(ctypes.Structure):
+#         pass
+#     _PyAsyncGenWrappedValue_Type_ptr = ctypes.addressof(
+#         _ctypes_PyTypeObject.in_dll(
+#             ctypes.pythonapi, "_PyAsyncGenWrappedValue_Type"))
+#     _PyObject_GC_New = ctypes.pythonapi._PyObject_GC_New
+#     _PyObject_GC_New.restype = ctypes.py_object
+#     _PyObject_GC_New.argtypes = (ctypes.c_void_p,)
+#
+#     _Py_IncRef = ctypes.pythonapi.Py_IncRef
+#     _Py_IncRef.restype = None
+#     _Py_IncRef.argtypes = (ctypes.py_object,)
+#
+#     class _ctypes_PyAsyncGenWrappedValue(ctypes.Structure):
+#         _fields_ = [
+#             ('PyObject_HEAD', ctypes.c_byte * object().__sizeof__()),
+#             ('agw_val', ctypes.py_object),
+#         ]
+#     def _wrap(value):
+#         box = _PyObject_GC_New(_PyAsyncGenWrappedValue_Type_ptr)
+#         raw = ctypes.cast(ctypes.c_void_p(id(box)),
+#                           ctypes.POINTER(_ctypes_PyAsyncGenWrappedValue))
+#         raw.contents.agw_val = value
+#         _Py_IncRef(value)
+#         return box
+#
+#     def _unwrap(box):
+#         assert _is_wrapped(box)
+#         raw = ctypes.cast(ctypes.c_void_p(id(box)),
+#                           ctypes.POINTER(_ctypes_PyAsyncGenWrappedValue))
+#         value = raw.contents.agw_val
+#         _Py_IncRef(value)
+#         return value
+#
+#     _PyAsyncGenWrappedValue_Type = type(_wrap(1))
+#     def _is_wrapped(box):
+#         return isinstance(box, _PyAsyncGenWrappedValue_Type)
 
-    _PyAsyncGenWrappedValue = type(_wrap(1))
-    def _is_wrapped(box):
-        return isinstance(box, _PyAsyncGenWrappedValue)
-
-    class _ctypes_PyAsyncGenWrappedValue(ctypes.Structure):
-        _fields_ = [
-            ('PyObject_HEAD', ctypes.c_byte * object().__sizeof__()),
-            ('agw_val', ctypes.py_object),
-        ]
-    def _unwrap(box):
-        assert _is_wrapped(box)
-        raw = ctypes.cast(ctypes.c_void_p(id(box)),
-                          ctypes.POINTER(_ctypes_PyAsyncGenWrappedValue))
-        return raw.contents.agw_val
 
 # The magic @coroutine decorator is how you write the bottom level of
 # coroutine stacks -- 'async def' can only use 'await' = yield from; but
