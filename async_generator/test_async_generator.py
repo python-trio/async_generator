@@ -275,20 +275,20 @@ async def async_range_twice(count):
     await yield_(None)
     await yield_from_(async_range(count))
 
+if sys.version_info >= (3, 6):
+    exec("""
+async def native_async_range(count):
+    for i in range(count):
+        yield i
+
 # XX uncomment if/when we re-enable the ctypes hacks:
-# if sys.version_info >= (3, 6):
-#     exec("""
-# async def native_async_range(count):
-#     for i in range(count):
-#         yield i
-#
 # async def native_async_range_twice(count):
 #     # make sure yield_from_ works inside a native async generator
 #     await yield_from_(async_range(count))
 #     yield None
 #     # make sure we can yield_from_ a native async generator
 #     await yield_from_(native_async_range(count))
-#     """)
+    """)
 
 @pytest.mark.asyncio
 async def test_async_yield_from_():
@@ -296,10 +296,11 @@ async def test_async_yield_from_():
         0, 1, 2, None, 0, 1, 2,
     ]
 
-    if sys.version_info >= (3, 6):
-        assert await collect(native_async_range_twice(3)) == [
-            0, 1, 2, None, 0, 1, 2,
-        ]
+    # XX uncomment if/when we re-enable the ctypes hacks:
+    # if sys.version_info >= (3, 6):
+    #     assert await collect(native_async_range_twice(3)) == [
+    #         0, 1, 2, None, 0, 1, 2,
+    #     ]
 
 @async_generator
 async def doubles_sends(value):
