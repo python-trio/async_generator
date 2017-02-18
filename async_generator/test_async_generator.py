@@ -158,11 +158,11 @@ async def test_reentrance_forbidden():
     @async_generator
     async def recurse():
         async for obj in agen:  # pragma: no branch
-            await yield_(obj)
+            await yield_(obj)  # pragma: no cover
     agen = recurse()
     with pytest.raises(ValueError):
         async for _ in agen:  # pragma: no branch
-            pass
+            pass  # pragma: no cover
 
 ################################################################
 #
