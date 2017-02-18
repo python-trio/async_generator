@@ -210,6 +210,7 @@ class AsyncGenerator:
     def __init__(self, coroutine):
         self._coroutine = coroutine
         self._it = coroutine.__await__()
+        self.ag_running = False
 
     # On python 3.5.0 and 3.5.1, __aiter__ must be awaitable.
     # Starting in 3.5.2, it should not be awaitable, and if it is, then it
@@ -224,6 +225,18 @@ class AsyncGenerator:
     else:
         def __aiter__(self):
             return self
+
+    ################################################################
+    # Introspection attributes
+    ################################################################
+
+    @property
+    def ag_code(self):
+        return self._coroutine.cr_code
+
+    @property
+    def ag_frame(self):
+        return self._coroutine.cr_frame
 
     ################################################################
     # Core functionality
@@ -249,7 +262,13 @@ class AsyncGenerator:
         # to avoid iterating stopped coroutines.
         if getcoroutinestate(self._coroutine) is CORO_CLOSED:
             raise StopAsyncIteration()
-        return await ANextIter(self._it, start_fn, *args)
+        if self.ag_running:
+            raise ValueError("async generator already executing")
+        try:
+            self.ag_running = True
+            return await ANextIter(self._it, start_fn, *args)
+        finally:
+            self.ag_running = False
 
     ################################################################
     # Cleanup

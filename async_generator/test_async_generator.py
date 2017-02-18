@@ -153,6 +153,17 @@ def test_yield_different_entries():
     yielded = hostile_coroutine_runner(coro)
     assert yielded == [1, 2, 3, 4]
 
+@pytest.mark.asyncio
+async def test_reentrance_forbidden():
+    @async_generator
+    async def recurse():
+        async for obj in agen:  # pragma: no branch
+            await yield_(obj)
+    agen = recurse()
+    with pytest.raises(ValueError):
+        async for _ in agen:  # pragma: no branch
+            pass
+
 ################################################################
 #
 # asend
@@ -558,6 +569,18 @@ def test_collections_abc_AsyncGenerator():
     if hasattr(collections.abc, "AsyncGenerator"):
         assert isinstance(async_range(10), collections.abc.AsyncGenerator)
 
+@pytest.mark.asyncio
+async def test_ag_attributes():
+    @async_generator
+    async def f():
+        x = 1
+        await yield_()
+
+    agen = f()
+    assert agen.ag_code.co_name == "f"
+    async for _ in agen:  # pragma: no branch
+        assert agen.ag_frame.f_locals["x"] == 1
+        break
 
 ################################################################
 # Finicky tests to check that the overly clever ctype stuff has plausible
