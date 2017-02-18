@@ -312,7 +312,7 @@ async def test_async_yield_from_():
         @async_generator
         async def yield_from_native():
             await yield_from_(native_async_range(3))
-        assert await collect(yield_from_native(3)) == [0, 1, 2]
+        assert await collect(yield_from_native()) == [0, 1, 2]
 
     # XX uncomment if/when we re-enable the ctypes hacks:
     # if sys.version_info >= (3, 6):
