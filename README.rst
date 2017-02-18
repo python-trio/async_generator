@@ -224,6 +224,15 @@ with the ``collections.abc.AsyncGenerator`` abstract base class:
 Changes
 =======
 
+1.6 (????-??-??)
+----------------
+
+* Add support for async generator introspection attributes
+  ``ag_running``, ``ag_code``, ``ag_frame``.
+* Attempting to re-enter a running async_generator now raises
+  ``ValueError``, just like for native async generators.
+
+
 1.5 (2017-01-15)
 ----------------
 
