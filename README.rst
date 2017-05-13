@@ -224,6 +224,15 @@ with the ``collections.abc.AsyncGenerator`` abstract base class:
 Changes
 =======
 
+1.7 (2017-05-13)
+----------------
+
+* Fix a subtle bug where if you wrapped an async generator using
+  ``functools.wraps``, then ``isasyncgenfunction`` would return True
+  for the wrapper. This isn't how ``inspect.isasyncgenfunction``
+  works, and it broke ``sphinxcontrib_trio``.
+
+
 1.6 (2017-02-17)
 ----------------
 

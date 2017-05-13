@@ -1,8 +1,10 @@
+import pytest
+
 import types
 import sys
 import asyncio
-import pytest
 import collections.abc
+from functools import wraps
 
 from . import (
     async_generator, yield_, yield_from_, isasyncgen, isasyncgenfunction,
@@ -571,6 +573,31 @@ def test_isasyncgenfunction():
     if sys.version_info >= (3, 6):
         assert isasyncgenfunction(native_async_range)
         assert not isasyncgenfunction(native_async_range(10))
+
+# Very subtle bug: functools.wraps copies across the entire contents of the
+# wrapped function's __dict__. We used to use a simple _is_async_gen=True
+# attribute to mark async generators. But if we do that, then simple wrappers
+# like async_range_wrapper *do* return True for isasyncgenfunction. But that's
+# not how inspect.isasyncgenfunction works, and it also caused problems for
+# sphinxcontrib-trio, because given a function like:
+#
+# @acontextmanager
+# @async_generator
+# async def async_cm():
+#    ...
+#
+# then we end up with async_cm introspecting as both an async context manager
+# and an async generator, and it doesn't know who to believe. With the
+# correct, inspect.isasyncgenfunction-compliant behavior, we have async_cm
+# introspecting as an async context manager, and async_cm.__wrapped__
+# introspecting as an async generator.
+def test_isasyncgenfunction_is_not_inherited_by_wrappers():
+    @wraps(async_range)
+    def async_range_wrapper(*args, **kwargs):
+        return async_range(*args, **kwargs)
+
+    assert not isasyncgenfunction(async_range_wrapper)
+    assert isasyncgenfunction(async_range_wrapper.__wrapped__)
 
 def test_collections_abc_AsyncGenerator():
     if hasattr(collections.abc, "AsyncGenerator"):

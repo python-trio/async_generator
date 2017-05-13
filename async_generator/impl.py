@@ -304,7 +304,7 @@ def async_generator(coroutine_maker):
     @wraps(coroutine_maker)
     def async_generator_maker(*args, **kwargs):
         return AsyncGenerator(coroutine_maker(*args, **kwargs))
-    async_generator_maker._is_async_gen_function = True
+    async_generator_maker._async_gen_function = id(async_generator_maker)
     return async_generator_maker
 
 def isasyncgen(obj):
@@ -317,4 +317,4 @@ def isasyncgenfunction(obj):
     if hasattr(inspect, "isasyncgenfunction"):
         if inspect.isasyncgenfunction(obj):
             return True
-    return getattr(obj, "_is_async_gen_function", False)
+    return getattr(obj, "_async_gen_function", -1) == id(obj)
