@@ -650,3 +650,29 @@ def test_refcnt():
     print(sys.getrefcount(x))
     assert sys.getrefcount(x) == base_count
     print(sys.getrefcount(x))
+
+################################################################
+#
+# Edge cases
+#
+################################################################
+
+# PEP 479: StopIteration or StopAsyncIteration exiting from inside an async
+# generator should produce a RuntimeError with the __cause__ set to the
+# original exception. Note that contextlib.asynccontextmanager depends on this
+# behavior.
+@async_generator
+async def lets_exception_out():
+    await yield_()
+
+@pytest.mark.asyncio
+async def test_throw_StopIteration_or_StopAsyncIteration():
+    for cls in [StopIteration, StopAsyncIteration]:
+        agen = lets_exception_out()
+        await agen.asend(None)
+        exc = cls()
+        with pytest.raises(RuntimeError) as excinfo:
+            await agen.athrow(exc)
+        assert excinfo.type is RuntimeError
+        assert excinfo.value.__cause__ is exc
+

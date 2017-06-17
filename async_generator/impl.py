@@ -201,6 +201,14 @@ class ANextIter:
             # The underlying generator returned, so we should signal the end
             # of iteration.
             raise StopAsyncIteration(e.value)
+        except StopAsyncIteration as e:
+            # PEP 479 says: if a generator raises Stop(Async)Iteration, then
+            # it should be wrapped into a RuntimeError. Python automatically
+            # enforces this for StopIteration; for StopAsyncIteration we need
+            # to it ourselves.
+            raise RuntimeError(
+                "async_generator raise StopAsyncIteration"
+            ) from e
         if _is_wrapped(result):
             raise StopIteration(_unwrap(result))
         else:
