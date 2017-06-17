@@ -623,6 +623,7 @@ async def test_ag_attributes():
 
 from . import impl
 
+@pytest.mark.skipif(not hasattr(sys, "getrefcount"), reason="CPython only")
 def test_refcnt():
     x = object()
     print(sys.getrefcount(x))
