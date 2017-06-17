@@ -5,6 +5,7 @@ import sys
 import asyncio
 import collections.abc
 from functools import wraps
+import gc
 
 from . import (
     async_generator, yield_, yield_from_, isasyncgen, isasyncgenfunction,
@@ -676,3 +677,18 @@ async def test_throw_StopIteration_or_StopAsyncIteration():
         assert excinfo.type is RuntimeError
         assert excinfo.value.__cause__ is exc
 
+# No "coroutine was never awaited" warnings for async generators that are not
+# iterated
+@pytest.mark.asyncio
+async def test_no_spurious_unawaited_coroutine_warning(recwarn):
+    agen = async_range(10)
+    del agen
+
+    # Run collection a few times to make sure any
+    # loops/resurrection/etc. stuff gets fully handled (necessary on pypy)
+    for _ in range(4):
+        gc.collect()
+
+    for msg in recwarn:
+        print(msg)
+        assert not issubclass(msg.category, RuntimeWarning)

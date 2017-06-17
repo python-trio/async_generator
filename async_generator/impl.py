@@ -299,6 +299,10 @@ class AsyncGenerator:
             raise RuntimeError("async_generator ignored GeneratorExit")
 
     def __del__(self):
+        if getcoroutinestate(self._coroutine) is CORO_CREATED:
+            # Never started, nothing to clean up, just suppress the "coroutine
+            # never awaited" message.
+            self._coroutine.close()
         if getcoroutinestate(self._coroutine) is CORO_SUSPENDED:
             # This exception will get swallowed because this is __del__, but
             # it's an easy way to trigger the print-to-console logic
