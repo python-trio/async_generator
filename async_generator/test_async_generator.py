@@ -594,7 +594,7 @@ def test_isasyncgenfunction():
 # introspecting as an async generator.
 def test_isasyncgenfunction_is_not_inherited_by_wrappers():
     @wraps(async_range)
-    def async_range_wrapper(*args, **kwargs):
+    def async_range_wrapper(*args, **kwargs):  # pragma: no cover
         return async_range(*args, **kwargs)
 
     assert not isasyncgenfunction(async_range_wrapper)
@@ -690,6 +690,9 @@ async def test_no_spurious_unawaited_coroutine_warning(recwarn):
     for _ in range(4):
         gc.collect()
 
-    for msg in recwarn:
+    # I've seen DeprecationWarnings here triggered by pytest-asyncio, so let's
+    # filter for RuntimeWarning. But if there are no warnings at all, then
+    # that's OK too, so tell coverage not to worry about it.
+    for msg in recwarn:  # pragma: no cover
         print(msg)
         assert not issubclass(msg.category, RuntimeWarning)
