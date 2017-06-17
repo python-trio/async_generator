@@ -3,6 +3,7 @@ python:
   - 3.5.0
   - 3.5.2
   - 3.6
+  - pypy3.5-5.8.0
 sudo: false
 
 before_install:
