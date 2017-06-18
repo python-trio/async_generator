@@ -3,7 +3,7 @@ from .impl import (
 )
 from .util import aclosing
 
-__version__ = "1.8"
+__version__ = "1.8+dev"
 
 __all__ = ["async_generator", "yield_", "yield_from_", "aclosing",
            "isasyncgen", "isasyncgenfunction"]
