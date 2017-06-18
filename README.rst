@@ -79,15 +79,15 @@ instead of writing ``yield x`` you write ``await yield_(x)``:
 Semantics
 =========
 
-This library generally follows `PEP 525
-<https://www.python.org/dev/peps/pep-0525/>`__ semantics ("as seen in
-Python 3.6!"), except that it adds ``yield from`` support, and it
-doesn't currently support the ``sys.{get,set}_asyncgen_hooks`` garbage
-collection API. There are two main reasons for this: (a) it doesn't
-exist on Python 3.5, and (b) even on 3.6, only built-in generators are
-supposed to use that API, and that's not us. In any case, you probably
-shouldn't be relying on garbage collection for async generators – see
-`this discussion
+This library generally tries hard to match the semantics of Python
+3.6's native async generators in every detail (`PEP 525
+<https://www.python.org/dev/peps/pep-0525/>`__), except that it adds
+``yield from`` support, and it doesn't currently support the
+``sys.{get,set}_asyncgen_hooks`` garbage collection API. There are two
+main reasons for this: (a) it doesn't exist on Python 3.5, and (b)
+even on 3.6, only built-in generators are supposed to use that API,
+and that's not us. In any case, you probably shouldn't be relying on
+garbage collection for async generators – see `this discussion
 <https://vorpus.org/blog/some-thoughts-on-asynchronous-api-design-in-a-post-asyncawait-world/#cleanup-in-generators-and-async-generators>`__
 and `PEP 533 <https://www.python.org/dev/peps/pep-0533/>`__ for more
 details.
@@ -223,6 +223,18 @@ with the ``collections.abc.AsyncGenerator`` abstract base class:
 
 Changes
 =======
+
+1.8 (2017-06-17)
+----------------
+
+* Implement PEP 479: if a ``StopAsyncIteration`` leaks out of an async
+  generator body, wrap it into a ``RuntimeError``.
+* If an async generator was instantiated but never iterated, then we
+  used to issue a spurious "RuntimeWarning: coroutine '...' was never
+  awaited" warning. This is now fixed.
+* Add PyPy3 to our test matrix.
+* 100% test coverage.
+
 
 1.7 (2017-05-13)
 ----------------
