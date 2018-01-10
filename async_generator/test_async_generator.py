@@ -167,6 +167,24 @@ async def test_reentrance_forbidden():
         async for _ in agen:  # pragma: no branch
             pass  # pragma: no cover
 
+# https://bugs.python.org/issue32526
+@pytest.mark.asyncio
+async def test_reentrance_forbidden_while_suspended_in_coroutine_runner():
+    @async_generator
+    async def f():
+        await asyncio.sleep(1)
+        await yield_()
+
+    ag = f()
+    asend_coro = ag.asend(None)
+    fut = asend_coro.send(None)
+    # Now the async generator's frame is not executing, but a call to asend()
+    # *is* executing. Make sure that in this case, ag_running is True, and we
+    # can't start up another call to asend().
+    assert ag.ag_running
+    with pytest.raises(ValueError):
+        await ag.asend(None)
+
 ################################################################
 #
 # asend
