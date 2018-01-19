@@ -157,17 +157,22 @@ async def test_asynccontextmanager_different_exception():
             raise KeyError
 
 
-def test_asynccontextmanager_nice_message_on_sync_enter():
+async def test_asynccontextmanager_nice_message_on_sync_enter():
     @asynccontextmanager
     @async_generator
     async def xxx():  # pragma: no cover
-        pass
+        await yield_()
+
+    cm = xxx()
 
     with pytest.raises(RuntimeError) as excinfo:
-        with xxx():
+        with cm:
             pass  # pragma: no cover
 
     assert "async with" in str(excinfo.value)
+
+    async with cm:
+        pass
 
 
 async def test_asynccontextmanager_no_yield():
