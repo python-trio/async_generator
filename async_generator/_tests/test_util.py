@@ -153,6 +153,8 @@ async def test_asynccontextmanager_no_yield():
 
 
 async def test_asynccontextmanager_too_many_yields():
+    closed_count = 0
+
     @asynccontextmanager
     @async_generator
     async def doubleyield():
@@ -160,19 +162,25 @@ async def test_asynccontextmanager_too_many_yields():
             await yield_()
         except Exception:
             pass
-        await yield_()
+        try:
+            await yield_()
+        finally:
+            nonlocal closed_count
+            closed_count += 1
 
     with pytest.raises(RuntimeError) as excinfo:
         async with doubleyield():
             pass
 
     assert "didn't stop" in str(excinfo.value)
+    assert closed_count == 1
 
     with pytest.raises(RuntimeError) as excinfo:
         async with doubleyield():
             raise ValueError
 
     assert "didn't stop after athrow" in str(excinfo.value)
+    assert closed_count == 2
 
 
 async def test_asynccontextmanager_requires_asyncgenfunction():

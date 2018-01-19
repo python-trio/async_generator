@@ -36,50 +36,52 @@ class _AsyncGeneratorContextManager:
             raise RuntimeError("async generator didn't yield") from None
 
     async def __aexit__(self, type, value, traceback):
-        if type is None:
-            try:
-                await self._agen.asend(None)
-            except StopAsyncIteration:
-                return False
+        async with aclosing(self._agen):
+            if type is None:
+                try:
+                    await self._agen.asend(None)
+                except StopAsyncIteration:
+                    return False
+                else:
+                    raise RuntimeError("async generator didn't stop")
             else:
-                raise RuntimeError("async generator didn't stop")
-        else:
-            # It used to be possible to have type != None, value == None:
-            #    https://bugs.python.org/issue1705170
-            # but AFAICT this can't happen anymore.
-            assert value is not None
-            try:
-                await self._agen.athrow(type, value, traceback)
-                raise RuntimeError(
-                    "async generator didn't stop after athrow()"
-                )
-            except StopAsyncIteration as exc:
-                # Suppress StopIteration *unless* it's the same exception that
-                # was passed to throw().  This prevents a StopIteration
-                # raised inside the "with" statement from being suppressed.
-                return (exc is not value)
-            except RuntimeError as exc:
-                # Don't re-raise the passed in exception. (issue27112)
-                if exc is value:
-                    return False
-                # Likewise, avoid suppressing if a StopIteration exception
-                # was passed to throw() and later wrapped into a RuntimeError
-                # (see PEP 479).
-                if (isinstance(value, (StopIteration, StopAsyncIteration))
-                        and exc.__cause__ is value):
-                    return False
-                raise
-            except:
-                # only re-raise if it's *not* the exception that was
-                # passed to throw(), because __exit__() must not raise
-                # an exception unless __exit__() itself failed.  But throw()
-                # has to raise the exception to signal propagation, so this
-                # fixes the impedance mismatch between the throw() protocol
-                # and the __exit__() protocol.
-                #
-                if sys.exc_info()[1] is value:
-                    return False
-                raise
+                # It used to be possible to have type != None, value == None:
+                #    https://bugs.python.org/issue1705170
+                # but AFAICT this can't happen anymore.
+                assert value is not None
+                try:
+                    await self._agen.athrow(type, value, traceback)
+                    raise RuntimeError(
+                        "async generator didn't stop after athrow()"
+                    )
+                except StopAsyncIteration as exc:
+                    # Suppress StopIteration *unless* it's the same exception
+                    # that was passed to throw(). This prevents a
+                    # StopIteration raised inside the "with" statement from
+                    # being suppressed.
+                    return (exc is not value)
+                except RuntimeError as exc:
+                    # Don't re-raise the passed in exception. (issue27112)
+                    if exc is value:
+                        return False
+                    # Likewise, avoid suppressing if a StopIteration exception
+                    # was passed to throw() and later wrapped into a
+                    # RuntimeError (see PEP 479).
+                    if (isinstance(value, (StopIteration, StopAsyncIteration))
+                            and exc.__cause__ is value):
+                        return False
+                    raise
+                except:
+                    # only re-raise if it's *not* the exception that was
+                    # passed to throw(), because __exit__() must not raise an
+                    # exception unless __exit__() itself failed. But throw()
+                    # has to raise the exception to signal propagation, so
+                    # this fixes the impedance mismatch between the throw()
+                    # protocol and the __exit__() protocol.
+                    #
+                    if sys.exc_info()[1] is value:
+                        return False
+                    raise
 
     def __enter__(self):
         raise RuntimeError(
