@@ -1,0 +1,62 @@
+#!/bin/bash
+
+set -ex
+
+YAPF_VERSION=0.20.1
+
+if [ "$USE_PYPY_RELEASE_VERSION" != "" ]; then
+    curl -fLo pypy.tar.bz2 https://bitbucket.org/squeaky/portable-pypy/downloads/pypy3.5-${USE_PYPY_RELEASE_VERSION}-linux_x86_64-portable.tar.bz2
+    tar xaf pypy.tar.bz2
+    # something like "pypy3.5-5.7.1-beta-linux_x86_64-portable"
+    PYPY_DIR=$(echo pypy3.5-*)
+    PYTHON_EXE=$PYPY_DIR/bin/pypy3
+    $PYTHON_EXE -m ensurepip
+    $PYTHON_EXE -m pip install virtualenv
+    $PYTHON_EXE -m virtualenv testenv
+    source testenv/bin/activate
+fi
+
+pip install -U pip setuptools wheel
+
+if [ "$CHECK_FORMATTING" = "1" ]; then
+    pip install yapf==${YAPF_VERSION}
+    if ! yapf -rpd setup.py async_generator; then
+        cat <<EOF
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+Formatting problems were found (listed above). To fix them, run
+
+   pip install yapf==${YAPF_VERSION}
+   yapf -rpi setup.py async_generator
+
+in your local checkout.
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+EOF
+        exit 1
+    fi
+    exit 0
+fi
+
+python setup.py sdist --formats=zip
+pip install dist/*.zip
+
+if [ "$CHECK_DOCS" = "1" ]; then
+    pip install -Ur ci/rtd-requirements.txt
+    cd docs
+    # -n (nit-picky): warn on missing references
+    # -W: turn warnings into errors
+    sphinx-build -nW  -b html source build
+else
+    # Actual tests
+    pip install -Ur test-requirements.txt
+
+    mkdir empty
+    cd empty
+
+    pytest -W error -ra -v --pyargs async_generator --cov=async_generator --cov-config=../.coveragerc --verbose
+
+    bash <(curl -s https://codecov.io/bash)
+fi
