@@ -5,6 +5,14 @@ Release history
 
 .. towncrier release notes start
 
+1.9 (future)
+------------
+
+* Add :func:`asynccontextmanager`
+* Move under the auspices of the Trio project
+  * This includes a license change from MIT → dual MIT+Apache2
+  * Various changes to project organization to match Trio project standard
+
 1.8 (2017-06-17)
 ----------------
 
