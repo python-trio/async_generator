@@ -12,7 +12,6 @@ async def async_range(count, closed_slot):
         closed_slot[0] = True
 
 
-@pytest.mark.asyncio
 async def test_aclosing():
     closed_slot = [False]
     async with aclosing(async_range(10, closed_slot)) as gen:
@@ -36,7 +35,6 @@ async def test_aclosing():
     assert closed_slot[0]
 
 
-@pytest.mark.asyncio
 async def test_contextmanager_do_not_unchain_non_stopiteration_exceptions():
     @asynccontextmanager
     @async_generator
@@ -100,7 +98,6 @@ except SyntaxError:
     not nativeasyncgenerators,
     reason="Python < 3.6 doesn't have native async generators"
 )
-@pytest.mark.asyncio
 async def test_native_contextmanager_do_not_unchain_non_stopiteration_exceptions(
 ):
 
@@ -118,7 +115,6 @@ async def test_native_contextmanager_do_not_unchain_non_stopiteration_exceptions
         assert excinfo.value.__cause__ is None
 
 
-@pytest.mark.asyncio
 async def test_asynccontextmanager_exception_passthrough():
     # This was the cause of annoying coverage flapping, see gh-140
     @asynccontextmanager
@@ -132,7 +128,6 @@ async def test_asynccontextmanager_exception_passthrough():
                 raise exc_type
 
 
-@pytest.mark.asyncio
 async def test_asynccontextmanager_catches_exception():
     @asynccontextmanager
     @async_generator
@@ -144,7 +139,6 @@ async def test_asynccontextmanager_catches_exception():
         raise ValueError
 
 
-@pytest.mark.asyncio
 async def test_asynccontextmanager_no_yield():
     @asynccontextmanager
     @async_generator
@@ -158,7 +152,6 @@ async def test_asynccontextmanager_no_yield():
     assert "didn't yield" in str(excinfo.value)
 
 
-@pytest.mark.asyncio
 async def test_asynccontextmanager_too_many_yields():
     @asynccontextmanager
     @async_generator
@@ -182,7 +175,6 @@ async def test_asynccontextmanager_too_many_yields():
     assert "didn't stop after athrow" in str(excinfo.value)
 
 
-@pytest.mark.asyncio
 async def test_asynccontextmanager_requires_asyncgenfunction():
     with pytest.raises(TypeError):
 

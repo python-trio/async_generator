@@ -55,7 +55,6 @@ class HasAsyncGenMethod:
             await yield_(value * self._factor)
 
 
-@pytest.mark.asyncio
 async def test_async_generator():
     assert await collect(async_range(10)) == list(range(10))
     assert (await collect(double(async_range(5))) == [0, 2, 4, 6, 8])
@@ -72,7 +71,6 @@ async def agen_yield_no_arg():
     await yield_()
 
 
-@pytest.mark.asyncio
 async def test_yield_no_arg():
     assert await collect(agen_yield_no_arg()) == [None]
 
@@ -91,7 +89,6 @@ async def async_gen_with_non_None_return():
     return "hi"
 
 
-@pytest.mark.asyncio
 async def test_bad_return_value():
     gen = async_gen_with_non_None_return()
     async for item in gen:  # pragma: no branch
@@ -181,7 +178,6 @@ def test_yield_different_entries():
     assert yielded == [1, 2, 3, 4]
 
 
-@pytest.mark.asyncio
 async def test_reentrance_forbidden():
     @async_generator
     async def recurse():
@@ -195,7 +191,6 @@ async def test_reentrance_forbidden():
 
 
 # https://bugs.python.org/issue32526
-@pytest.mark.asyncio
 async def test_reentrance_forbidden_while_suspended_in_coroutine_runner():
     @async_generator
     async def f():
@@ -226,7 +221,6 @@ async def asend_me():
     assert (await yield_(3)) == 4
 
 
-@pytest.mark.asyncio
 async def test_asend():
     aiter = asend_me()
     assert (await aiter.__anext__()) == 1
@@ -251,7 +245,6 @@ async def athrow_me():
     await yield_(3)
 
 
-@pytest.mark.asyncio
 async def test_athrow():
     aiter = athrow_me()
     assert (await aiter.__anext__()) == 1
@@ -279,7 +272,6 @@ async def close_me_aiter(track):
         track[0] = "wtf"
 
 
-@pytest.mark.asyncio
 async def test_aclose():
     track = [None]
     aiter = close_me_aiter(track)
@@ -291,7 +283,6 @@ async def test_aclose():
     assert track[0] == "closed"
 
 
-@pytest.mark.asyncio
 async def test_aclose_on_unstarted_generator():
     aiter = close_me_aiter([None])
     await aiter.aclose()
@@ -299,7 +290,6 @@ async def test_aclose_on_unstarted_generator():
         assert False  # pragma: no cover
 
 
-@pytest.mark.asyncio
 async def test_aclose_on_finished_generator():
     aiter = async_range(3)
     async for obj in aiter:
@@ -323,7 +313,6 @@ async def async_yield_during_aclose():
         await yield_(2)
 
 
-@pytest.mark.asyncio
 async def test_aclose_yielding():
     aiter = sync_yield_during_aclose()
     assert (await aiter.__anext__()) == 1
@@ -368,7 +357,6 @@ async def native_async_range(count):
     )
 
 
-@pytest.mark.asyncio
 async def test_async_yield_from_():
     assert await collect(async_range_twice(3)) == [
         0,
@@ -406,7 +394,6 @@ async def wraps_doubles_sends(value):
     await yield_from_(doubles_sends(value))
 
 
-@pytest.mark.asyncio
 async def test_async_yield_from_asend():
     gen = wraps_doubles_sends(10)
     await gen.__anext__() == 20
@@ -416,7 +403,6 @@ async def test_async_yield_from_asend():
     await gen.aclose()
 
 
-@pytest.mark.asyncio
 async def test_async_yield_from_athrow():
     gen = async_range_twice(2)
     assert (await gen.__anext__()) == 0
@@ -435,13 +421,11 @@ async def yields_from_returns_1():
     await yield_(await yield_from_(returns_1()))
 
 
-@pytest.mark.asyncio
 async def test_async_yield_from_return_value():
     assert await collect(yields_from_returns_1()) == [0, 1]
 
 
 # Special cases to get coverage
-@pytest.mark.asyncio
 async def test_yield_from_empty():
     @async_generator
     async def empty():
@@ -454,7 +438,6 @@ async def test_yield_from_empty():
     assert await collect(yield_from_empty()) == []
 
 
-@pytest.mark.asyncio
 async def test_yield_from_non_generator():
     class Countdown:
         def __init__(self, count):
@@ -524,7 +507,6 @@ async def test_yield_from_non_generator():
     assert h == ["countdown closed", "raise"]
 
 
-@pytest.mark.asyncio
 async def test_yield_from_non_generator_with_no_aclose():
     class Countdown:
         def __init__(self, count):
@@ -559,7 +541,6 @@ async def test_yield_from_non_generator_with_no_aclose():
     await agen.aclose()
 
 
-@pytest.mark.asyncio
 async def test_yield_from_with_old_style_aiter():
     # old-style 'async def __aiter__' should still work even on newer pythons
     class Countdown:
@@ -584,7 +565,6 @@ async def test_yield_from_with_old_style_aiter():
     assert await collect(yield_from_countdown(3)) == [2, 1, 0]
 
 
-@pytest.mark.asyncio
 async def test_yield_from_athrow_raises_StopAsyncIteration():
     @async_generator
     async def catch():
@@ -615,7 +595,6 @@ async def test_yield_from_athrow_raises_StopAsyncIteration():
 ################################################################
 
 
-@pytest.mark.asyncio
 async def test___del__():
     gen = async_range(10)
     # Hasn't started yet, so no problem
@@ -699,7 +678,6 @@ def test_collections_abc_AsyncGenerator():
         assert isinstance(async_range(10), collections.abc.AsyncGenerator)
 
 
-@pytest.mark.asyncio
 async def test_ag_attributes():
     @async_generator
     async def f():
@@ -767,7 +745,6 @@ async def lets_exception_out():
     await yield_()
 
 
-@pytest.mark.asyncio
 async def test_throw_StopIteration_or_StopAsyncIteration():
     for cls in [StopIteration, StopAsyncIteration]:
         agen = lets_exception_out()
@@ -781,7 +758,6 @@ async def test_throw_StopIteration_or_StopAsyncIteration():
 
 # No "coroutine was never awaited" warnings for async generators that are not
 # iterated
-@pytest.mark.asyncio
 async def test_no_spurious_unawaited_coroutine_warning(recwarn):
     agen = async_range(10)
     del agen
