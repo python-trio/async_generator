@@ -5,10 +5,13 @@ Release history
 
 .. towncrier release notes start
 
-1.9 (future)
-------------
+1.9 (2018-01-19)
+----------------
 
 * Add :func:`asynccontextmanager`
+* When a partially-exhausted ``async_generator`` is garbage collected,
+  the warning printed now includes the generator's name to help you
+  track it down.
 * Move under the auspices of the Trio project
   * This includes a license change from MIT → dual MIT+Apache2
   * Various changes to project organization to match Trio project standard
