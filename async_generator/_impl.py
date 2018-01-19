@@ -45,7 +45,7 @@ def _unwrap(box):
 #     # We used to call _PyAsyncGenValueWrapperNew to create and set up new
 #     # wrapper objects, but that symbol isn't available on Windows:
 #     #
-#     #   https://github.com/njsmith/async_generator/issues/5
+#     #   https://github.com/python-trio/async_generator/issues/5
 #     #
 #     # Fortunately, the type object is available, but it means we have to do
 #     # this the hard way.
