@@ -1,9 +1,19 @@
-from .impl import (
-    async_generator, yield_, yield_from_, isasyncgen, isasyncgenfunction,
+from ._version import __version__
+from ._impl import (
+    async_generator,
+    yield_,
+    yield_from_,
+    isasyncgen,
+    isasyncgenfunction,
 )
-from .util import aclosing
+from ._util import aclosing, asynccontextmanager
 
-__version__ = "1.8+dev"
-
-__all__ = ["async_generator", "yield_", "yield_from_", "aclosing",
-           "isasyncgen", "isasyncgenfunction"]
+__all__ = [
+    "async_generator",
+    "yield_",
+    "yield_from_",
+    "aclosing",
+    "isasyncgen",
+    "isasyncgenfunction",
+    "asynccontextmanager",
+]

@@ -2,27 +2,36 @@ language: python
 python:
   - 3.5.0
   - 3.5.2
-  - 3.6
   - 3.5-dev
+  - 3.6
   - 3.6-dev
   - 3.7-dev
-  - pypy3.5-5.8.0
 sudo: false
+dist: trusty
 
-before_install:
-  - pip install -Ur test-requirements.txt
-  - pip install codecov
-
-install:
-  - python setup.py sdist --formats=zip
-  - pip install dist/*.zip
+matrix:
+  include:
+    - os: linux
+      language: generic
+      env: USE_PYPY_RELEASE_VERSION=5.9-beta
+    # Uncomment if you want to test on pypy nightly
+    # - os: linux
+    #   language: generic
+    #   env: USE_PYPY_NIGHTLY=1
+    # - os: osx
+    #   language: generic
+    #   env: MACPYTHON=3.5.4
+    # - os: osx
+    #   language: generic
+    #   env: MACPYTHON=3.6.3
+    - os: linux
+      language: python
+      python: 3.6
+      env: CHECK_DOCS=1
+    - os: linux
+      language: python
+      python: 3.6
+      env: CHECK_FORMATTING=1
 
 script:
-  - mkdir empty
-  - cd empty
-  - INSTALLDIR=$(python -c "import os, async_generator; print(os.path.dirname(async_generator.__file__))")
-  - py.test --pyargs async_generator --cov="$INSTALLDIR" --cov-config=../.coveragerc
-
-
-after_success:
-  - codecov
+  - ci/travis.sh

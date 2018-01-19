@@ -3,21 +3,27 @@ from functools import wraps
 from types import coroutine
 import inspect
 from inspect import (
-    getcoroutinestate, CORO_CREATED, CORO_CLOSED, CORO_SUSPENDED)
+    getcoroutinestate, CORO_CREATED, CORO_CLOSED, CORO_SUSPENDED
+)
 import collections.abc
+
 
 class YieldWrapper:
     def __init__(self, payload):
         self.payload = payload
 
+
 def _wrap(value):
     return YieldWrapper(value)
+
 
 def _is_wrapped(box):
     return isinstance(box, YieldWrapper)
 
+
 def _unwrap(box):
     return box.payload
+
 
 # This is the magic code that lets you use yield_ and yield_from_ with native
 # generators.
@@ -92,11 +98,13 @@ def _unwrap(box):
 def _yield_(value):
     return (yield _wrap(value))
 
+
 # But we wrap the bare @coroutine version in an async def, because async def
 # has the magic feature that users can get warnings messages if they forget to
 # use 'await'.
 async def yield_(value=None):
     return await _yield_(value)
+
 
 async def yield_from_(delegate):
     # Transcribed with adaptations from:
@@ -115,6 +123,7 @@ async def yield_from_(delegate):
             return e.args[0]
         else:
             return None
+
     _i = type(delegate).__aiter__(delegate)
     if hasattr(_i, "__await__"):
         _i = await _i
@@ -156,6 +165,7 @@ async def yield_from_(delegate):
                     _r = unpack_StopAsyncIteration(_e)
                     break
     return _r
+
 
 # This is the awaitable / iterator that implements asynciter.__anext__() and
 # friends.
@@ -214,6 +224,7 @@ class ANextIter:
         else:
             return result
 
+
 class AsyncGenerator:
     def __init__(self, coroutine):
         self._coroutine = coroutine
@@ -228,9 +239,11 @@ class AsyncGenerator:
     #   https://docs.python.org/3/reference/datamodel.html#async-iterators
     #   https://bugs.python.org/issue27243
     if sys.version_info < (3, 5, 2):
+
         async def __aiter__(self):
             return self
     else:
+
         def __aiter__(self):
             return self
 
@@ -307,23 +320,30 @@ class AsyncGenerator:
             # This exception will get swallowed because this is __del__, but
             # it's an easy way to trigger the print-to-console logic
             raise RuntimeError(
-                "partially-exhausted async_generator garbage collected")
+                "partially-exhausted async_generator {!r} garbage collected"
+                .format(self._coroutine.cr_frame.f_code.co_name)
+            )
+
 
 if hasattr(collections.abc, "AsyncGenerator"):
     collections.abc.AsyncGenerator.register(AsyncGenerator)
+
 
 def async_generator(coroutine_maker):
     @wraps(coroutine_maker)
     def async_generator_maker(*args, **kwargs):
         return AsyncGenerator(coroutine_maker(*args, **kwargs))
+
     async_generator_maker._async_gen_function = id(async_generator_maker)
     return async_generator_maker
+
 
 def isasyncgen(obj):
     if hasattr(inspect, "isasyncgen"):
         if inspect.isasyncgen(obj):
             return True
     return isinstance(obj, AsyncGenerator)
+
 
 def isasyncgenfunction(obj):
     if hasattr(inspect, "isasyncgenfunction"):
