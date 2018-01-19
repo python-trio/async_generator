@@ -6,9 +6,9 @@ from ._impl import (
     isasyncgen,
     isasyncgenfunction,
 )
-from ._util import aclosing
+from ._util import aclosing, asynccontextmanager
 
 __all__ = [
     "async_generator", "yield_", "yield_from_", "aclosing", "isasyncgen",
-    "isasyncgenfunction"
+    "isasyncgenfunction", "asynccontextmanager",
 ]

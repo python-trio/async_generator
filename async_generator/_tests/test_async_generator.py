@@ -7,7 +7,7 @@ import collections.abc
 from functools import wraps
 import gc
 
-from . import (
+from .. import (
     async_generator,
     yield_,
     yield_from_,
@@ -717,7 +717,7 @@ async def test_ag_attributes():
 # Finicky tests to check that the overly clever ctype stuff has plausible
 # refcounting
 
-from . import impl
+from .. import _impl
 
 
 @pytest.mark.skipif(not hasattr(sys, "getrefcount"), reason="CPython only")
@@ -728,12 +728,12 @@ def test_refcnt():
     print(sys.getrefcount(x))
     print(sys.getrefcount(x))
     base_count = sys.getrefcount(x)
-    l = [impl._wrap(x) for _ in range(100)]
+    l = [_impl._wrap(x) for _ in range(100)]
     print(sys.getrefcount(x))
     print(sys.getrefcount(x))
     print(sys.getrefcount(x))
     assert sys.getrefcount(x) >= base_count + 100
-    l2 = [impl._unwrap(box) for box in l]
+    l2 = [_impl._unwrap(box) for box in l]
     assert sys.getrefcount(x) >= base_count + 200
     print(sys.getrefcount(x))
     print(sys.getrefcount(x))
