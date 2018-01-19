@@ -6,16 +6,16 @@
    :target: https://async-generator.readthedocs.io/en/latest/?badge=latest
    :alt: Documentation Status
 
-.. image:: https://travis-ci.org/njsmith/async_generator.svg?branch=master
-   :target: https://travis-ci.org/njsmith/async_generator
+.. image:: https://travis-ci.org/python-trio/async_generator.svg?branch=master
+   :target: https://travis-ci.org/python-trio/async_generator
    :alt: Automated test status
 
 .. image:: https://ci.appveyor.com/api/projects/status/af4eyed8o8tc3t0r/branch/master?svg=true
    :target: https://ci.appveyor.com/project/python-trio/trio/history
    :alt: Automated test status (Windows)
 
-.. image:: https://codecov.io/gh/njsmith/async_generator/branch/master/graph/badge.svg
-   :target: https://codecov.io/gh/njsmith/async_generator
+.. image:: https://codecov.io/gh/python-trio/async_generator/branch/master/graph/badge.svg
+   :target: https://codecov.io/gh/python-trio/async_generator
    :alt: Test coverage
 
 The async_generator library
