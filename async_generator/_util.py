@@ -2,6 +2,7 @@ import sys
 from functools import wraps
 from ._impl import isasyncgenfunction
 
+
 class aclosing:
     def __init__(self, aiter):
         self._aiter = aiter
