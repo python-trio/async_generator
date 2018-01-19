@@ -127,6 +127,10 @@ async def test_asynccontextmanager_exception_passthrough():
             async with noop_async_context_manager():
                 raise exc_type
 
+    # And let's also check a boring nothing pass-through while we're at it
+    async with noop_async_context_manager():
+        pass
+
 
 async def test_asynccontextmanager_catches_exception():
     @asynccontextmanager
@@ -137,6 +141,33 @@ async def test_asynccontextmanager_catches_exception():
 
     async with catch_it():
         raise ValueError
+
+
+async def test_asynccontextmanager_different_exception():
+    @asynccontextmanager
+    @async_generator
+    async def switch_it():
+        try:
+            await yield_()
+        except KeyError:
+            raise ValueError
+
+    with pytest.raises(ValueError):
+        async with switch_it():
+            raise KeyError
+
+
+def test_asynccontextmanager_nice_message_on_sync_enter():
+    @asynccontextmanager
+    @async_generator
+    async def xxx():  # pragma: no cover
+        pass
+
+    with pytest.raises(RuntimeError) as excinfo:
+        with xxx():
+            pass  # pragma: no cover
+
+    assert "async with" in str(excinfo.value)
 
 
 async def test_asynccontextmanager_no_yield():
