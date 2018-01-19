@@ -320,7 +320,8 @@ class AsyncGenerator:
             # This exception will get swallowed because this is __del__, but
             # it's an easy way to trigger the print-to-console logic
             raise RuntimeError(
-                "partially-exhausted async_generator garbage collected"
+                "partially-exhausted async_generator {!r} garbage collected"
+                .format(self._coroutine.cr_frame.f_code.co_name)
             )
 
 
