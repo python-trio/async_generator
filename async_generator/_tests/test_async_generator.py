@@ -2,11 +2,11 @@ import pytest
 
 import types
 import sys
-import asyncio
 import collections.abc
 from functools import wraps
 import gc
 
+from .conftest import mock_sleep
 from .. import (
     async_generator,
     yield_,
@@ -42,7 +42,7 @@ async def async_range(count):
 async def double(ait):
     async for value in ait:
         await yield_(value * 2)
-        await asyncio.sleep(0.001)
+        await mock_sleep()
 
 
 class HasAsyncGenMethod:
@@ -194,18 +194,24 @@ async def test_reentrance_forbidden():
 async def test_reentrance_forbidden_while_suspended_in_coroutine_runner():
     @async_generator
     async def f():
-        await asyncio.sleep(1)
-        await yield_()
+        await mock_sleep()
+        await yield_("final yield")
 
     ag = f()
     asend_coro = ag.asend(None)
     fut = asend_coro.send(None)
+    assert fut == "mock_sleep"
     # Now the async generator's frame is not executing, but a call to asend()
     # *is* executing. Make sure that in this case, ag_running is True, and we
     # can't start up another call to asend().
     assert ag.ag_running
     with pytest.raises(ValueError):
         await ag.asend(None)
+    # Clean up
+    with pytest.raises(StopIteration):
+        asend_coro.send(None)
+    with pytest.raises(StopAsyncIteration):
+        ag.asend(None).send(None)
 
 
 ################################################################
@@ -302,7 +308,7 @@ async def sync_yield_during_aclose():
     try:
         await yield_(1)
     finally:
-        await asyncio.sleep(0)
+        await mock_sleep()
 
 
 @async_generator

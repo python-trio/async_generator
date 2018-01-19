@@ -1,6 +1,12 @@
 import pytest
 from functools import wraps, partial
 import inspect
+import types
+
+
+@types.coroutine
+def mock_sleep():
+    yield "mock_sleep"
 
 
 # Wrap any 'async def' tests so that they get automatically iterated.
@@ -18,7 +24,12 @@ def pytest_pyfunc_call(pyfuncitem):
         def wrapper(**kwargs):
             coro = fn(**kwargs)
             try:
-                coro.send(None)
+                while True:
+                    value = coro.send(None)
+                    if value != "mock_sleep":  # pragma: no cover
+                        raise RuntimeError(
+                            "coroutine runner confused: {!r}".format(value)
+                        )
             except StopIteration:
                 pass
 
