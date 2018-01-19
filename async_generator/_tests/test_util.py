@@ -2,6 +2,7 @@ import pytest
 
 from . import aclosing, async_generator, yield_
 
+
 @async_generator
 async def async_range(count, closed_slot):
     try:
@@ -9,6 +10,7 @@ async def async_range(count, closed_slot):
             await yield_(i)
     except GeneratorExit:
         closed_slot[0] = True
+
 
 @pytest.mark.asyncio
 async def test_aclosing():
