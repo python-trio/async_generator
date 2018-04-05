@@ -28,6 +28,8 @@ Basically:
 That's it!
 
 
+.. _yieldfrom:
+
 Yield from
 ~~~~~~~~~~
 
@@ -47,9 +49,12 @@ But we do::
     async def wrap_load_json_lines(stream_reader):
         await yield_from_(load_json_lines(stream_reader))
 
-You can only use ``yield_from_`` inside an ``@async_generator``
-function, BUT the thing you PASS to ``yield_from_`` can be any kind of
-async iterator, including native async generators.
+You can use ``yield_from_`` inside a native async generator or an
+``@async_generator`` function, and the argument can be any async
+iterable. Remember that a native async generator is only created
+when an ``async def`` block contains at least one ``yield``
+statement; if you only ``yield_from_`` and never ``yield``,
+use the ``@async_generator`` decorator.
 
 Our ``yield_from_`` fully supports the classic ``yield from``
 semantics, including forwarding ``asend`` and ``athrow`` calls into
