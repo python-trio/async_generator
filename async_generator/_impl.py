@@ -1,94 +1,134 @@
 import sys
 from functools import wraps
-from types import coroutine
+from types import coroutine, CodeType
 import inspect
 from inspect import (
     getcoroutinestate, CORO_CREATED, CORO_CLOSED, CORO_SUSPENDED
 )
 import collections.abc
 
+# An async generator object (whether native in 3.6+ or the pure-Python
+# version implemented below) is basically an async function with some
+# extra wrapping logic. As an async function, it can call other async
+# functions, which will probably at some point call a function that uses
+# 'yield' to send traps to the event loop. Async generators also need
+# to be able to send values to the context in which the generator is
+# being iterated, and it's awfully convenient to be able to do that
+# using 'yield' too. To distinguish between these two streams of
+# yielded objects, the traps intended for the event loop are yielded
+# as-is, and the values intended for the context that's iterating the
+# generator are wrapped in some wrapper object (YieldWrapper here, or
+# an internal Python type called AsyncGenWrappedValue in the native
+# async generator implementation) before being yielded.
+# The __anext__(), asend(), and athrow() methods of an async generator
+# iterate the underlying async function until a wrapped value is received,
+# and any unwrapped values are passed through to the event loop.
 
-class YieldWrapper:
-    def __init__(self, payload):
-        self.payload = payload
+# These functions are syntactically valid only on 3.6+, so we conditionally
+# exec() the code defining them.
+_native_asyncgen_helpers = """
+async def _wrapper():
+    holder = [None]
+    while True:
+        # The simpler "value = None; while True: value = yield value"
+        # would hold a reference to the most recently wrapped value
+        # after it has been yielded out (until the next value to wrap
+        # comes in), so we use a one-element list instead.
+        holder.append((yield holder.pop()))
+_wrapper = _wrapper()
 
+async def _unwrapper():
+    @coroutine
+    def inner():
+        holder = [None]
+        while True:
+            holder.append((yield holder.pop()))
+    await inner()
+    yield None
+_unwrapper = _unwrapper()
+"""
 
-def _wrap(value):
-    return YieldWrapper(value)
+if sys.implementation.name == "cpython" and sys.version_info >= (3, 6):
+    # On 3.6, with native async generators, we want to use the same
+    # wrapper type that native generators use. This lets @async_generators
+    # yield_from_ native async generators and vice versa.
 
+    import ctypes
+    from types import AsyncGeneratorType, GeneratorType
+    exec(_native_asyncgen_helpers)
 
-def _is_wrapped(box):
-    return isinstance(box, YieldWrapper)
+    # Transmute _wrapper to a regular generator object by modifying the
+    # ob_type field. The code object inside _wrapper will still think it's
+    # associated with an async generator, so it will yield out
+    # AsyncGenWrappedValues when it encounters a 'yield' statement;
+    # but the generator object will think it's a normal non-async
+    # generator, so it won't unwrap them. This way, we can obtain
+    # AsyncGenWrappedValues as normal manipulable Python objects.
+    #
+    # This sort of object type transmutation is categorically a Sketchy
+    # Thing To Do, because the functions associated with the new type
+    # (including tp_dealloc and so forth) will be operating on a
+    # structure whose in-memory layout matches that of the old type.
+    # In this case, it's OK, because async generator objects are just
+    # generator objects plus a few extra fields at the end; and these
+    # fields are two integers and a NULL-until-first-iteration object
+    # pointer, so they don't hold any resources that need to be cleaned up.
+    # We have a unit test that verifies that __sizeof__() for generators
+    # and async generators continues to follow this pattern in future
+    # Python versions.
 
+    _type_p = ctypes.c_size_t.from_address(
+        id(_wrapper) + ctypes.sizeof(ctypes.c_size_t)
+    )
+    assert _type_p.value == id(AsyncGeneratorType)
+    _type_p.value = id(GeneratorType)
 
-def _unwrap(box):
-    return box.payload
+    supports_native_asyncgens = True
 
+    # Now _wrapper.send(x) returns an AsyncGenWrappedValue of x.
+    # We have to initially send(None) since the generator was just constructed;
+    # we look at the type of the return value (which is AsyncGenWrappedValue(None))
+    # to help with _is_wrapped.
+    YieldWrapper = type(_wrapper.send(None))
 
-# This is the magic code that lets you use yield_ and yield_from_ with native
-# generators.
-#
-# The old version worked great on Linux and MacOS, but not on Windows, because
-# it depended on _PyAsyncGenValueWrapperNew. The new version segfaults
-# everywhere, and I'm not sure why -- probably my lack of understanding
-# of ctypes and refcounts.
-#
-# There are also some commented out tests that should be re-enabled if this is
-# fixed:
-#
-# if sys.version_info >= (3, 6):
-#     # Use the same box type that the interpreter uses internally. This allows
-#     # yield_ and (more importantly!) yield_from_ to work in built-in
-#     # generators.
-#     import ctypes  # mua ha ha.
-#
-#     # We used to call _PyAsyncGenValueWrapperNew to create and set up new
-#     # wrapper objects, but that symbol isn't available on Windows:
-#     #
-#     #   https://github.com/python-trio/async_generator/issues/5
-#     #
-#     # Fortunately, the type object is available, but it means we have to do
-#     # this the hard way.
-#
-#     # We don't actually need to access this, but we need to make a ctypes
-#     # structure so we can call addressof.
-#     class _ctypes_PyTypeObject(ctypes.Structure):
-#         pass
-#     _PyAsyncGenWrappedValue_Type_ptr = ctypes.addressof(
-#         _ctypes_PyTypeObject.in_dll(
-#             ctypes.pythonapi, "_PyAsyncGenWrappedValue_Type"))
-#     _PyObject_GC_New = ctypes.pythonapi._PyObject_GC_New
-#     _PyObject_GC_New.restype = ctypes.py_object
-#     _PyObject_GC_New.argtypes = (ctypes.c_void_p,)
-#
-#     _Py_IncRef = ctypes.pythonapi.Py_IncRef
-#     _Py_IncRef.restype = None
-#     _Py_IncRef.argtypes = (ctypes.py_object,)
-#
-#     class _ctypes_PyAsyncGenWrappedValue(ctypes.Structure):
-#         _fields_ = [
-#             ('PyObject_HEAD', ctypes.c_byte * object().__sizeof__()),
-#             ('agw_val', ctypes.py_object),
-#         ]
-#     def _wrap(value):
-#         box = _PyObject_GC_New(_PyAsyncGenWrappedValue_Type_ptr)
-#         raw = ctypes.cast(ctypes.c_void_p(id(box)),
-#                           ctypes.POINTER(_ctypes_PyAsyncGenWrappedValue))
-#         raw.contents.agw_val = value
-#         _Py_IncRef(value)
-#         return box
-#
-#     def _unwrap(box):
-#         assert _is_wrapped(box)
-#         raw = ctypes.cast(ctypes.c_void_p(id(box)),
-#                           ctypes.POINTER(_ctypes_PyAsyncGenWrappedValue))
-#         value = raw.contents.agw_val
-#         _Py_IncRef(value)
-#         return value
-#
-#     _PyAsyncGenWrappedValue_Type = type(_wrap(1))
-#     def _is_wrapped(box):
-#         return isinstance(box, _PyAsyncGenWrappedValue_Type)
+    # Advance _unwrapper to its first yield statement, for use by _unwrap().
+    _unwrapper.asend(None).send(None)
+
+    # Performance note: compared to the non-native-supporting implementation below,
+    # this _wrap() is about the same speed (434 +- 16 nsec here, 456 +- 24 nsec below)
+    # but this _unwrap() is much slower (1.17 usec vs 167 nsec). Since _unwrap is only
+    # needed on non-native generators, and we plan to have most @async_generators use
+    # native generators on 3.6+, this seems acceptable.
+
+    _wrap = _wrapper.send
+
+    def _is_wrapped(box):
+        return isinstance(box, YieldWrapper)
+
+    def _unwrap(box):
+        try:
+            _unwrapper.asend(box).send(None)
+        except StopIteration as e:
+            return e.value
+        else:
+            raise TypeError("not wrapped")
+else:
+    supports_native_asyncgens = False
+
+    class YieldWrapper:
+        __slots__ = ("payload",)
+
+        def __init__(self, payload):
+            self.payload = payload
+
+    def _wrap(value):
+        return YieldWrapper(value)
+
+    def _is_wrapped(box):
+        return isinstance(box, YieldWrapper)
+
+    def _unwrap(box):
+        return box.payload
 
 
 # The magic @coroutine decorator is how you write the bottom level of

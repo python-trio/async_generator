@@ -1,0 +1,1 @@
+On CPython 3.6+, restore the ability for a native async generator to ``yield_from_`` an ``@async_generator`` function and vice versa, by using the same value-wrapper type that Python uses internally if we're running on a Python version that supports native async generators. The new approach should be much less prone to refcounting bugs or to issues on different architectures.

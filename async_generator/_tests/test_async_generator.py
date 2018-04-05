@@ -5,6 +5,7 @@ import sys
 import collections.abc
 from functools import wraps
 import gc
+import inspect
 
 from .conftest import mock_sleep
 from .. import (
@@ -352,13 +353,12 @@ async def native_async_range(count):
     for i in range(count):
         yield i
 
-# XX uncomment if/when we re-enable the ctypes hacks:
-# async def native_async_range_twice(count):
-#     # make sure yield_from_ works inside a native async generator
-#     await yield_from_(async_range(count))
-#     yield None
-#     # make sure we can yield_from_ a native async generator
-#     await yield_from_(native_async_range(count))
+async def native_async_range_twice(count, async_range):
+    # make sure yield_from_ works inside a native async generator
+    await yield_from_(async_range(count))
+    yield None
+    # make sure we can yield_from_ a native async generator
+    await yield_from_(native_async_range(count))
     """
     )
 
@@ -382,11 +382,16 @@ async def test_async_yield_from_():
 
         assert await collect(yield_from_native()) == [0, 1, 2]
 
-    # XX uncomment if/when we re-enable the ctypes hacks:
-    # if sys.version_info >= (3, 6):
-    #     assert await collect(native_async_range_twice(3)) == [
-    #         0, 1, 2, None, 0, 1, 2,
-    #     ]
+    if sys.version_info >= (3, 6):
+        assert await collect(native_async_range_twice(3, async_range)) == [
+            0,
+            1,
+            2,
+            None,
+            0,
+            1,
+            2,
+        ]
 
 
 @async_generator
@@ -707,32 +712,47 @@ from .. import _impl
 @pytest.mark.skipif(not hasattr(sys, "getrefcount"), reason="CPython only")
 def test_refcnt():
     x = object()
-    print(sys.getrefcount(x))
-    print(sys.getrefcount(x))
-    print(sys.getrefcount(x))
-    print(sys.getrefcount(x))
     base_count = sys.getrefcount(x)
     l = [_impl._wrap(x) for _ in range(100)]
-    print(sys.getrefcount(x))
-    print(sys.getrefcount(x))
-    print(sys.getrefcount(x))
-    assert sys.getrefcount(x) >= base_count + 100
+    assert sys.getrefcount(x) == base_count + 100
     l2 = [_impl._unwrap(box) for box in l]
-    assert sys.getrefcount(x) >= base_count + 200
-    print(sys.getrefcount(x))
-    print(sys.getrefcount(x))
-    print(sys.getrefcount(x))
-    print(sys.getrefcount(x))
+    assert sys.getrefcount(x) == base_count + 200
     del l
-    print(sys.getrefcount(x))
-    print(sys.getrefcount(x))
-    print(sys.getrefcount(x))
+    assert sys.getrefcount(x) == base_count + 100
     del l2
-    print(sys.getrefcount(x))
-    print(sys.getrefcount(x))
-    print(sys.getrefcount(x))
     assert sys.getrefcount(x) == base_count
-    print(sys.getrefcount(x))
+
+
+@pytest.mark.skipif(
+    not hasattr(None, "__sizeof__") or not hasattr(inspect, "isasyncgen"),
+    reason="CPython with native asyncgens only"
+)
+def test_gen_agen_size():
+    def gen():  # pragma: no cover
+        yield 42
+
+    dct = {}
+    exec("async def agen(): yield 50", dct)
+    agen = dct["agen"]
+
+    # As of CPython 3.7, an async generator object is a generator object plus one pointer
+    # (PyObject *ag_finalizer, nullptr before first iteration) and two ints
+    # (ag_hooks_inited, ag_closed). Since none of these members require any cleanup,
+    # our sketchy agen->gen type transmutation in _impl._wrapper is safe (at the time
+    # we do it, i.e., before first iteration). If the below assertion starts firing
+    # on a future Python version, someone will need to audit the new definition of
+    # PyAsyncGenObject (in CPython's Include/genobject.h) and make sure its new fields
+    # remain safe to ignore under the circumstances used in the _wrapper hack.
+    from ctypes import sizeof, c_int, c_void_p
+    gen_size = gen().__sizeof__()
+    agen_size = agen().__sizeof__()
+    expected_delta = 2 * sizeof(c_int) + sizeof(c_void_p)
+    assert gen_size + expected_delta == agen_size
+
+
+def test_unwrap_not_wrapped():
+    with pytest.raises((TypeError, AttributeError)):
+        _impl._unwrap(42)
 
 
 ################################################################
