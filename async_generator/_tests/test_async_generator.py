@@ -13,6 +13,8 @@ from .. import (
     yield_from_,
     isasyncgen,
     isasyncgenfunction,
+    get_asyncgen_hooks,
+    set_asyncgen_hooks,
 )
 
 
@@ -188,6 +190,22 @@ async def test_reentrance_forbidden():
     with pytest.raises(ValueError):
         async for _ in agen:  # pragma: no branch
             pass  # pragma: no cover
+
+
+async def test_reentrance_forbidden_simultaneous_asends():
+    @async_generator
+    async def f():
+        await mock_sleep()
+
+    ag = f()
+    sender1 = ag.asend(None)
+    sender2 = ag.asend(None)
+    assert sender1.send(None) == "mock_sleep"
+    with pytest.raises(ValueError):
+        sender2.send(None)
+    with pytest.raises(StopAsyncIteration):
+        sender1.send(None)
+    await ag.aclose()
 
 
 # https://bugs.python.org/issue32526
@@ -601,31 +619,83 @@ async def test_yield_from_athrow_raises_StopAsyncIteration():
 ################################################################
 
 
-async def test___del__():
-    gen = async_range(10)
+async def test___del__(capfd):
+    completions = 0
+
+    @async_generator
+    async def awaits_when_unwinding():
+        await yield_(1)
+        try:
+            await yield_(2)
+        finally:
+            await mock_sleep()
+        try:
+            await yield_(3)
+        finally:
+            nonlocal completions
+            completions += 1
+
+    gen = awaits_when_unwinding()
     # Hasn't started yet, so no problem
     gen.__del__()
 
-    gen = async_range(10)
-    await collect(gen)
+    gen = awaits_when_unwinding()
+    assert await collect(gen) == [1, 2, 3]
     # Exhausted, so no problem
     gen.__del__()
 
-    gen = async_range(10)
-    await gen.aclose()
-    # Closed, so no problem
-    gen.__del__()
+    for turns in (1, 2, 3):
+        gen = awaits_when_unwinding()
+        for turn in range(1, turns + 1):
+            assert await gen.__anext__() == turn
+        await gen.aclose()
+        # Closed, so no problem
+        gen.__del__()
 
-    gen = async_range(10)
-    await gen.__anext__()
-    await gen.aclose()
-    # Closed, so no problem
-    gen.__del__()
+    for turns in (1, 2, 3):
+        gen = awaits_when_unwinding()
+        for turn in range(1, turns + 1):
+            assert await gen.__anext__() == turn
 
-    gen = async_range(10)
-    await gen.__anext__()
-    # Started, but not exhausted or closed -- big problem
-    with pytest.raises(RuntimeError):
+        if sys.implementation.name == "pypy":
+            # pypy can't do the full finalization dance yet:
+            # https://bitbucket.org/pypy/pypy/issues/2786/.
+            # Also, pypy suppresses exceptions on explicit __del__ calls,
+            # not just implicit ones.
+            with pytest.raises(RuntimeError) as info:
+                gen.__del__()
+            assert "partially-exhausted async_generator" in str(info.value)
+            if turns == 3:
+                # We didn't increment completions, because we didn't finalize
+                # the generator. Increment it now so the check below (which is
+                # calibrated for the correct/CPython behavior) doesn't fire;
+                # we know about the pypy bug.
+                completions += 1
+
+        elif turns == 2:
+            # Stopped in the middle of a try/finally that awaits in the finally,
+            # so __del__ can't cleanup.
+            with pytest.raises(RuntimeError) as info:
+                gen.__del__()
+            assert "awaited during finalization; install a finalization hook" in str(
+                info.value
+            )
+        else:
+            # Can clean up without awaiting, so __del__ is fine
+            gen.__del__()
+
+    assert completions == 3
+
+    @async_generator
+    async def yields_when_unwinding():
+        try:
+            await yield_(1)
+        finally:
+            await yield_(2)
+
+    gen = yields_when_unwinding()
+    assert await gen.__anext__() == 1
+    with pytest.raises(RuntimeError) as info:
         gen.__del__()
 
 
@@ -779,3 +849,170 @@ async def test_no_spurious_unawaited_coroutine_warning(recwarn):
     for msg in recwarn:  # pragma: no cover
         print(msg)
         assert not issubclass(msg.category, RuntimeWarning)
+
+
+################################################################
+#
+# GC hooks
+#
+################################################################
+
+
+@pytest.fixture
+def local_asyncgen_hooks():
+    old_hooks = get_asyncgen_hooks()
+    yield
+    set_asyncgen_hooks(*old_hooks)
+
+
+def test_gc_hooks_interface(local_asyncgen_hooks):
+    def one(agen):  # pragma: no cover
+        pass
+
+    def two(agen):  # pragma: no cover
+        pass
+
+    set_asyncgen_hooks(None, None)
+    assert get_asyncgen_hooks() == (None, None)
+    set_asyncgen_hooks(finalizer=two)
+    assert get_asyncgen_hooks() == (None, two)
+    set_asyncgen_hooks(firstiter=one)
+    assert get_asyncgen_hooks() == (one, two)
+    set_asyncgen_hooks(finalizer=None, firstiter=two)
+    assert get_asyncgen_hooks() == (two, None)
+    set_asyncgen_hooks(None, one)
+    assert get_asyncgen_hooks() == (None, one)
+    tup = (one, two)
+    set_asyncgen_hooks(*tup)
+    assert get_asyncgen_hooks() == tup
+
+    with pytest.raises(TypeError):
+        set_asyncgen_hooks(firstiter=42)
+
+    with pytest.raises(TypeError):
+        set_asyncgen_hooks(finalizer=False)
+
+    def in_thread(results=[]):
+        results.append(get_asyncgen_hooks())
+        set_asyncgen_hooks(two, one)
+        results.append(get_asyncgen_hooks())
+
+    from threading import Thread
+    results = []
+    thread = Thread(target=in_thread, args=(results,))
+    thread.start()
+    thread.join()
+    assert results == [(None, None), (two, one)]
+    assert get_asyncgen_hooks() == (one, two)
+
+
+async def test_gc_hooks_behavior(local_asyncgen_hooks):
+    events = []
+    to_finalize = []
+
+    def firstiter(agen):
+        events.append("firstiter {}".format(agen.ag_frame.f_locals["ident"]))
+
+    def finalizer(agen):
+        events.append("finalizer {}".format(agen.ag_frame.f_locals["ident"]))
+        to_finalize.append(agen)
+
+    @async_generator
+    async def agen(ident):
+        events.append("yield 1 {}".format(ident))
+        await yield_(1)
+        try:
+            events.append("yield 2 {}".format(ident))
+            await yield_(2)
+            events.append("after yield 2 {}".format(ident))
+        finally:
+            events.append("mock_sleep {}".format(ident))
+            await mock_sleep()
+        try:
+            events.append("yield 3 {}".format(ident))
+            await yield_(3)
+        finally:
+            events.append("unwind 3 {}".format(ident))
+        # this one is included to make sure we _don't_ execute it
+        events.append("done {}".format(ident))  # pragma: no cover
+
+    async def anext_verbosely(iter, ident):
+        events.append("before asend {}".format(ident))
+        sender = iter.asend(None)
+        events.append("before send {}".format(ident))
+        await sender
+        events.append("after asend {}".format(ident))
+
+    # Ensure that firstiter is called immediately on asend(),
+    # before the first turn of the coroutine that asend() returns,
+    # to match the behavior of native generators.
+    # Ensure that the firstiter that gets used is the one in effect
+    # at the time of that first call, rather than at the time of iteration.
+    iterA = agen("A")
+    iterB = agen("B")
+    await anext_verbosely(iterA, "A")
+    set_asyncgen_hooks(firstiter, finalizer)
+    await anext_verbosely(iterB, "B")
+    iterC = agen("C")
+    await anext_verbosely(iterC, "C")
+
+    assert events == [
+        "before asend A", "before send A", "yield 1 A", "after asend A",
+        "before asend B", "firstiter B", "before send B", "yield 1 B",
+        "after asend B", "before asend C", "firstiter C", "before send C",
+        "yield 1 C", "after asend C"
+    ]
+    del events[:]
+
+    if sys.implementation.name == "pypy":
+        # pypy segfaults if an async generator's __del__ is called (even if it resurrects!)
+        # and then the underlying coroutine encounters another await:
+        # https://bitbucket.org/pypy/pypy/issues/2786/
+        return
+
+    from weakref import ref
+    refA, refB, refC = map(ref, (iterA, iterB, iterC))
+
+    # iterA uses the finalizer that was in effect when it started, i.e. no finalizer
+    await iterA.__anext__()
+    await iterA.__anext__()
+    del iterA
+    gc.collect()
+    assert refA() is None
+    assert events == [
+        "yield 2 A", "after yield 2 A", "mock_sleep A", "yield 3 A",
+        "unwind 3 A"
+    ]
+    assert not to_finalize
+    del events[:]
+
+    # iterB and iterC do use our finalizer
+    await iterC.__anext__()
+    await iterB.__anext__()
+    await iterC.__anext__()
+    idB, idC = id(iterB), id(iterC)
+    del iterB
+    gc.collect()
+    del iterC
+    gc.collect()
+    assert events == [
+        "yield 2 C", "yield 2 B", "after yield 2 C", "mock_sleep C",
+        "yield 3 C", "finalizer B", "finalizer C"
+    ]
+    del events[:]
+
+    # finalizer invokes aclose() is not called again once the revived reference drops
+    assert list(map(id, to_finalize)) == [idB, idC]
+    events.append("before aclose B")
+    await to_finalize[0].aclose()
+    events.append("before aclose C")
+    await to_finalize[1].aclose()
+    events.append("after aclose both")
+    del to_finalize[:]
+    gc.collect()
+    assert refB() is None and refC() is None
+
+    assert events == [
+        "before aclose B", "mock_sleep B", "before aclose C", "unwind 3 C",
+        "after aclose both"
+    ]
