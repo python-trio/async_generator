@@ -5,6 +5,8 @@ from ._impl import (
     yield_from_,
     isasyncgen,
     isasyncgenfunction,
+    get_asyncgen_hooks,
+    set_asyncgen_hooks,
 )
 from ._util import aclosing, asynccontextmanager
 
@@ -16,4 +18,6 @@ __all__ = [
     "isasyncgen",
     "isasyncgenfunction",
     "asynccontextmanager",
+    "get_asyncgen_hooks",
+    "set_asyncgen_hooks",
 ]

@@ -1,0 +1,5 @@
+Add support for PEP 525-style finalization hooks via ``set_asyncgen_hooks()``
+and ``get_asyncgen_hooks()`` functions, which mimic the behavior of the ones
+in ``sys`` if we're running on a Python version that doesn't have them natively.
+``@async_generator`` generators behave the same way as native ones with respect
+to these hooks.
