@@ -72,10 +72,14 @@ if sys.implementation.name == "cpython" and sys.version_info >= (3, 6):
     # In this case, it's OK, because async generator objects are just
     # generator objects plus a few extra fields at the end; and these
     # fields are two integers and a NULL-until-first-iteration object
-    # pointer, so they don't hold any resources that need to be cleaned up.
-    # We have a unit test that verifies that __sizeof__() for generators
-    # and async generators continues to follow this pattern in future
-    # Python versions.
+    # pointer ag_finalizer, so they don't hold any resources that need
+    # to be cleaned up. (We transmute the async generator to a regular
+    # generator before we first iterate it, so ag_finalizer stays NULL
+    # for the lifetime of the object, and we never have an object we
+    # need to remember to drop our reference to.) We have a unit test
+    # that verifies that __sizeof__() for generators and async
+    # generators continues to follow this pattern in future Python
+    # versions.
 
     _type_p = ctypes.c_size_t.from_address(
         id(_wrapper) + ctypes.sizeof(ctypes.c_size_t)
