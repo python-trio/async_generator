@@ -317,6 +317,7 @@ class AsyncGenerator:
         self.ag_running = False
         self._finalizer = None
         self._closed = False
+        self._hooks_inited = False
 
     # On python 3.5.0 and 3.5.1, __aiter__ must be awaitable.
     # Starting in 3.5.2, it should not be awaitable, and if it is, then it
@@ -365,8 +366,8 @@ class AsyncGenerator:
         return self._do_it(self._it.throw, type, value, traceback)
 
     def _do_it(self, start_fn, *args):
-        coro_state = getcoroutinestate(self._coroutine)
-        if coro_state is CORO_CREATED:
+        if not self._hooks_inited:
+            self._hooks_inited = True
             (firstiter, self._finalizer) = get_asyncgen_hooks()
             if firstiter is not None:
                 firstiter(self)
@@ -397,6 +398,9 @@ class AsyncGenerator:
         state = getcoroutinestate(self._coroutine)
         if state is CORO_CLOSED or self._closed:
             return
+        # Make sure that even if we raise "async_generator ignored
+        # GeneratorExit", and thus fail to exhaust the coroutine,
+        # __del__ doesn't complain again.
         self._closed = True
         if state is CORO_CREATED:
             # Make sure that aclose() on an unstarted generator returns

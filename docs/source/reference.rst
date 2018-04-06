@@ -128,7 +128,11 @@ You can use ``async_generator.set_asyncgen_hooks()`` exactly
 like you would use ``sys.set_asyncgen_hooks()`` with native
 generators. On Python 3.6+, the former is an alias for the latter,
 so libraries that use the native mechanism should work seamlessly
-with ``@async_generator`` functions.
+with ``@async_generator`` functions. On Python 3.5, where there is
+no ``sys.set_asyncgen_hooks()``, most libraries probably *won't* know
+about ``async_generator.set_asyncgen_hooks()``, so you'll need
+to exercise more care with explicit cleanup, or install appropriate
+hooks yourself.
 
 While finishing cleanup of an async generator is better than dropping
 it on the floor at the first ``await``, it's still not a perfect solution;
