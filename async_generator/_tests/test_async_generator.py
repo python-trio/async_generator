@@ -624,13 +624,13 @@ async def test___del__(capfd):
 
     @async_generator
     async def awaits_when_unwinding():
-        await yield_(1)
+        await yield_(0)
         try:
-            await yield_(2)
+            await yield_(1)
         finally:
             await mock_sleep()
         try:
-            await yield_(3)
+            await yield_(2)
         finally:
             nonlocal completions
             completions += 1
@@ -640,21 +640,21 @@ async def test___del__(capfd):
     gen.__del__()
 
     gen = awaits_when_unwinding()
-    assert await collect(gen) == [1, 2, 3]
+    assert await collect(gen) == [0, 1, 2]
     # Exhausted, so no problem
     gen.__del__()
 
-    for turns in (1, 2, 3):
+    for stop_after_turn in (1, 2, 3):
         gen = awaits_when_unwinding()
-        for turn in range(1, turns + 1):
+        for turn in range(stop_after_turn):
             assert await gen.__anext__() == turn
         await gen.aclose()
         # Closed, so no problem
         gen.__del__()
 
-    for turns in (1, 2, 3):
+    for stop_after_turn in (1, 2, 3):
         gen = awaits_when_unwinding()
-        for turn in range(1, turns + 1):
+        for turn in range(stop_after_turn):
             assert await gen.__anext__() == turn
 
         if sys.implementation.name == "pypy":
@@ -665,14 +665,14 @@ async def test___del__(capfd):
             with pytest.raises(RuntimeError) as info:
                 gen.__del__()
             assert "partially-exhausted async_generator" in str(info.value)
-            if turns == 3:
+            if stop_after_turn == 3:
                 # We didn't increment completions, because we didn't finalize
                 # the generator. Increment it now so the check below (which is
                 # calibrated for the correct/CPython behavior) doesn't fire;
                 # we know about the pypy bug.
                 completions += 1
 
-        elif turns == 2:
+        elif stop_after_turn == 2:
             # Stopped in the middle of a try/finally that awaits in the finally,
             # so __del__ can't cleanup.
             with pytest.raises(RuntimeError) as info:
@@ -892,7 +892,7 @@ def test_gc_hooks_interface(local_asyncgen_hooks):
     with pytest.raises(TypeError):
         set_asyncgen_hooks(finalizer=False)
 
-    def in_thread(results=[]):
+    def in_thread(results):
         results.append(get_asyncgen_hooks())
         set_asyncgen_hooks(two, one)
         results.append(get_asyncgen_hooks())
@@ -962,6 +962,18 @@ async def test_gc_hooks_behavior(local_asyncgen_hooks):
         "after asend B", "before asend C", "firstiter C", "before send C",
         "yield 1 C", "after asend C"
     ]
+    del events[:]
+
+    # Ensure that firstiter is only called once, even if we create
+    # two asend() coroutines before iterating either of them.
+    iterX = agen("X")
+    sender1 = iterX.asend(None)
+    sender2 = iterX.asend(None)
+    events.append("before close")
+    sender1.close()
+    sender2.close()
+    await iterX.aclose()
+    assert events == ["firstiter X", "before close"]
     del events[:]
 
     if sys.implementation.name == "pypy":
