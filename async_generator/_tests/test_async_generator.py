@@ -657,22 +657,7 @@ async def test___del__(capfd):
         for turn in range(stop_after_turn):
             assert await gen.__anext__() == turn
 
-        if sys.implementation.name == "pypy":
-            # pypy can't do the full finalization dance yet:
-            # https://bitbucket.org/pypy/pypy/issues/2786/.
-            # Also, pypy suppresses exceptions on explicit __del__ calls,
-            # not just implicit ones.
-            with pytest.raises(RuntimeError) as info:
-                gen.__del__()
-            assert "partially-exhausted async_generator" in str(info.value)
-            if stop_after_turn == 3:
-                # We didn't increment completions, because we didn't finalize
-                # the generator. Increment it now so the check below (which is
-                # calibrated for the correct/CPython behavior) doesn't fire;
-                # we know about the pypy bug.
-                completions += 1
-
-        elif stop_after_turn == 2:
+        if stop_after_turn == 2:
             # Stopped in the middle of a try/finally that awaits in the finally,
             # so __del__ can't cleanup.
             with pytest.raises(RuntimeError) as info:
@@ -976,12 +961,6 @@ async def test_gc_hooks_behavior(local_asyncgen_hooks):
     assert events == ["firstiter X", "before close"]
     del events[:]
 
-    if sys.implementation.name == "pypy":
-        # pypy segfaults if an async generator's __del__ is called (even if it resurrects!)
-        # and then the underlying coroutine encounters another await:
-        # https://bitbucket.org/pypy/pypy/issues/2786/
-        return
-
     from weakref import ref
     refA, refB, refC = map(ref, (iterA, iterB, iterC))
 
@@ -989,7 +968,9 @@ async def test_gc_hooks_behavior(local_asyncgen_hooks):
     await iterA.__anext__()
     await iterA.__anext__()
     del iterA
-    gc.collect()
+    # Do multiple GC passes since we're deliberately shielding the
+    # coroutine objects from the first pass due to PyPy issue 2786.
+    for _ in range(4): gc.collect()
     assert refA() is None
     assert events == [
         "yield 2 A", "after yield 2 A", "mock_sleep A", "yield 3 A",
@@ -1004,9 +985,9 @@ async def test_gc_hooks_behavior(local_asyncgen_hooks):
     await iterC.__anext__()
     idB, idC = id(iterB), id(iterC)
     del iterB
-    gc.collect()
+    for _ in range(4): gc.collect()
     del iterC
-    gc.collect()
+    for _ in range(4): gc.collect()
     assert events == [
         "yield 2 C", "yield 2 B", "after yield 2 C", "mock_sleep C",
         "yield 3 C", "finalizer B", "finalizer C"
@@ -1021,7 +1002,7 @@ async def test_gc_hooks_behavior(local_asyncgen_hooks):
     await to_finalize[1].aclose()
     events.append("after aclose both")
     del to_finalize[:]
-    gc.collect()
+    for _ in range(4): gc.collect()
     assert refB() is None and refC() is None
 
     assert events == [
