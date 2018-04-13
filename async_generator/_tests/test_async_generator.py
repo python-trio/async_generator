@@ -970,7 +970,8 @@ async def test_gc_hooks_behavior(local_asyncgen_hooks):
     del iterA
     # Do multiple GC passes since we're deliberately shielding the
     # coroutine objects from the first pass due to PyPy issue 2786.
-    for _ in range(4): gc.collect()
+    for _ in range(4):
+        gc.collect()
     assert refA() is None
     assert events == [
         "yield 2 A", "after yield 2 A", "mock_sleep A", "yield 3 A",
@@ -985,9 +986,11 @@ async def test_gc_hooks_behavior(local_asyncgen_hooks):
     await iterC.__anext__()
     idB, idC = id(iterB), id(iterC)
     del iterB
-    for _ in range(4): gc.collect()
+    for _ in range(4):
+        gc.collect()
     del iterC
-    for _ in range(4): gc.collect()
+    for _ in range(4):
+        gc.collect()
     assert events == [
         "yield 2 C", "yield 2 B", "after yield 2 C", "mock_sleep C",
         "yield 3 C", "finalizer B", "finalizer C"
@@ -1002,7 +1005,8 @@ async def test_gc_hooks_behavior(local_asyncgen_hooks):
     await to_finalize[1].aclose()
     events.append("after aclose both")
     del to_finalize[:]
-    for _ in range(4): gc.collect()
+    for _ in range(4):
+        gc.collect()
     assert refB() is None and refC() is None
 
     assert events == [
