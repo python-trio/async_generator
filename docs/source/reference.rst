@@ -107,17 +107,42 @@ Semantics
 
 This library generally tries hard to match the semantics of Python
 3.6's native async generators in every detail (`PEP 525
-<https://www.python.org/dev/peps/pep-0525/>`__), except that it adds
-``yield from`` support, and it doesn't currently support the
-``sys.{get,set}_asyncgen_hooks`` garbage collection API. There are two
-main reasons for this: (a) it doesn't exist on Python 3.5, and (b)
-even on 3.6, only built-in generators are supposed to use that API,
-and that's not us. In any case, you probably shouldn't be relying on
-garbage collection for async generators – see `this discussion
+<https://www.python.org/dev/peps/pep-0525/>`__), with additional
+support for ``yield from`` and for returning non-None values from
+an async generator (under the theory that these may well be added
+to native async generators one day).
+
+
+Garbage collection hooks
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+This library fully supports the native async generator
+`finalization semantics <https://www.python.org/dev/peps/pep-0525/#finalization>`__,
+including the per-thread ``firstiter`` and ``finalizer`` hooks.
+You can use ``async_generator.set_asyncgen_hooks()`` exactly
+like you would use ``sys.set_asyncgen_hooks()`` with native
+generators. On Python 3.6+, the former is an alias for the latter,
+so libraries that use the native mechanism should work seamlessly
+with ``@async_generator`` functions. On Python 3.5, where there is
+no ``sys.set_asyncgen_hooks()``, most libraries probably *won't* know
+about ``async_generator.set_asyncgen_hooks()``, so you'll need
+to exercise more care with explicit cleanup, or install appropriate
+hooks yourself.
+
+While finishing cleanup of an async generator is better than dropping
+it on the floor at the first ``await``, it's still not a perfect solution;
+in addition to the unpredictability of GC timing, the ``finalizer`` hook
+has no practical way to determine the context in which the generator was
+being iterated, so an exception thrown from the generator during ``aclose()``
+must either crash the program or get discarded. It's much better to close
+your generators explicitly when you're done with them, perhaps using the
+:ref:`aclosing context manager <contextmanagers>`. See `this discussion
 <https://vorpus.org/blog/some-thoughts-on-asynchronous-api-design-in-a-post-asyncawait-world/#cleanup-in-generators-and-async-generators>`__
 and `PEP 533 <https://www.python.org/dev/peps/pep-0533/>`__ for more
 details.
 
+
+.. _contextmanagers:
 
 Context managers
 ----------------
@@ -135,7 +160,7 @@ module, but does ``await obj.aclose()`` instead of
        async for json_obj in agen:
            ...
 
-Or if you want to write your own async context managers, we got you
+Or if you want to write your own async context managers, we've got you
 covered:
 
 .. function:: asynccontextmanager
