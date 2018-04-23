@@ -13,7 +13,7 @@ setup(
     long_description=Path(__file__).with_name("README.rst").read_text('utf-8'),
     author="Nathaniel J. Smith",
     author_email="njs@pobox.com",
-    license="MIT",
+    license="MIT -or- Apache License 2.0",
     packages=find_packages(),
     url="https://github.com/python-trio/async_generator",
     python_requires=">=3.5",
