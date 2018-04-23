@@ -1,2 +1,4 @@
 include LICENSE README.rst CODE_OF_CONDUCT.md
 include test-requirements.txt .coveragerc
+recursive-include docs *
+prune docs/build
