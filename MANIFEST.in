@@ -1,2 +1,6 @@
-include LICENSE README.rst CODE_OF_CONDUCT.md
+include LICENSE LICENSE.MIT LICENSE.APACHE2
+include README.rst
+include CODE_OF_CONDUCT.md CONTRIBUTING.md
 include test-requirements.txt .coveragerc
+recursive-include docs *
+prune docs/build
