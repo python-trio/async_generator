@@ -5,6 +5,27 @@ Release history
 
 .. towncrier release notes start
 
+Async_Generator 1.10 (2018-07-31)
+---------------------------------
+
+Features
+~~~~~~~~
+
+- Add support for PEP 525-style finalization hooks via
+  ``set_asyncgen_hooks()`` and ``get_asyncgen_hooks()`` functions. On
+  Python 3.6+, these are aliases for the versions in ``sys``; on
+  Python 3.5, they're work-alike implementations. And,
+  ``@async_generator`` generators now call these hooks at the
+  appropriate times. (`#15
+  <https://github.com/python-trio/trio/issues/15>`__)
+
+Fixes
+~~~~~
+
+- Package now properly includes license files. (`#11
+  <https://github.com/python-trio/async_generator/pull/11>`__)
+
+
 1.9 (2018-01-19)
 ----------------
 
@@ -12,9 +33,9 @@ Release history
 * When a partially-exhausted ``async_generator`` is garbage collected,
   the warning printed now includes the generator's name to help you
   track it down.
-* Move under the auspices of the Trio project
-  * This includes a license change from MIT → dual MIT+Apache2
-  * Various changes to project organization to match Trio project standard
+* Move under the auspices of the Trio project. This includes a license
+  change from MIT → dual MIT+Apache2, and various changes to internal
+  organization to match Trio project standard.
 
 1.8 (2017-06-17)
 ----------------
